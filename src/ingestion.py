@@ -3,36 +3,121 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import udf, col
 from pyspark.sql.types import StringType, IntegerType, FloatType, ArrayType, StructType, StructField, MapType
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 import time
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
 import requests
 
-# Function to look up ICAO code using API
+# Function to look up ICAO code by its ID using an API
+# TODO: see if there is a more consistent way to do this
 def get_icao_by_id(airport_code):
     if not airport_code:
         return None
     try:
         url = f"https://airportsapi.com/api/airports?filter%5Bcode%5D={airport_code.upper()}"
         headers = {'Accept': 'application/json'}
+
         response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
+
         data = response.json().get('data', [])
-        if not data:
-            return None
-        return data[0]['attributes'].get('icao_code')
+
+        if not data: 
+            print(f"No airport found with name '{airport_code}'") 
+            return None 
+        
+        airport_obj = data[0]['attributes'] 
+        icao_code = airport_obj.get('icao_code') 
+
+        if not icao_code: 
+            print(f"ICAO code not available for '{airport_code}'") 
+            return None 
+           
+        return icao_code
+    
     except Exception:
         return None
+
+
+# Function to look up ICAO code by its name using an API
+# TODO: see if there is a more consistent way to do this
+def get_icao_by_name(airport_name): 
+    url = f"https://airportsapi.com/api/airports?filter%5Bname%5D={airport_name.replace(' ', '+')}" 
+    headers = {'Accept': 'application/json'} 
     
-# METAR data scraping -- opens up browser and fills out form and takes relevant data
-# TODO: figure out a different way to do this--its pretty slow
-def get_metar_data(icao_code, planeDate, planeTime):
+    response = requests.get(url, headers=headers) 
+    response.raise_for_status() 
+
+    data = response.json().get('data', []) 
+
+    if not data: 
+        print(f"No airport found with name '{airport_name}'") 
+        return None 
+
+    airport_obj = data[0]['attributes'] 
+    icao_code = airport_obj.get('icao_code') 
+    
+    if not icao_code: 
+        print(f"ICAO code not available for '{airport_name}'") 
+        return None 
+    
+    return icao_code
+
+
+# Generates url for metar api call based on where and when
+def gen_url(icao_code,date):
+    base = "https://flightsupport24.com/map/archive.php?"
+
+    month, day, year = date.split("/")
+
+    request_URL = base + "station=" + icao_code + "&data=metar" + \
+        "&year1="+ year + "&month1=" + month + "&day1=" + day + \
+        "&year2="+year+"&month2="+ month+"&day2="+day+ \
+        "&tz=Etc/UTC&format=onlytdf&latlon=no&elev=no&missing=M&trace=T&direct=no&report_type=2"
+
+    return request_URL
+    
+# METAR data scraping -- makes api call 
+def get_metar_data(icao_code, departureDate, departureTime):
+    url = gen_url(icao_code, departureDate)
+
+    try:
+        res = requests.get(url).text
+        mtr_data = res.strip().splitlines()[1:]        
+
+         # Convert target time to minutes since midnight
+        target_dt = datetime.strptime(departureTime, "%H:%M")
+        target_minutes = target_dt.hour * 60 + target_dt.minute
+
+        best_row = None
+        smallest_diff = None
+
+        for row in mtr_data:
+            parts = row.split()
+            if len(parts) < 3:
+                continue
+
+            row_time_str = parts[2]  # the time of the observation
+
+            try:
+                row_dt = datetime.strptime(row_time_str, "%H:%M")
+                row_minutes = row_dt.hour * 60 + row_dt.minute
+            except ValueError:
+                continue
+
+            if row_minutes <= target_minutes:
+                diff = target_minutes - row_minutes
+                if smallest_diff is None or diff < smallest_diff:
+                    smallest_diff = diff
+                    best_row = row
+
+        return best_row or None
+        
+    except requests.exceptions.RequestException as e:
+        print('Error:', e)
+        return None
+
     print("get metar data on",planeDate)
     if not icao_code:
         return None
@@ -228,11 +313,11 @@ def metar_to_json(metar_str):
 # TODO: connect everything into one table
 def main():
     # Testing METAR scraping works
-    airport_name = "Charlotte Douglas International Airport"
+    airport = "CLT"
     planeDate = "10/01/2025"
     planeTime = "08:00" 
 
-    metar = get_metar_data(airport_name, planeDate, planeTime)
+    metar = get_metar_data(airport, planeDate, planeTime)
     if metar:
         print(metar)
     else:
