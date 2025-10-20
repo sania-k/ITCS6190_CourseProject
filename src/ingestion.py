@@ -182,7 +182,7 @@ def get_metar_string(url,timestamp):
     """
 
     try:
-        time.sleep(0.5) #TODO: proper api rate limitings
+        time.sleep(0.25) #TODO: proper api rate limitings
         res = requests.get(url).text        
 
         metar_list = res.strip().splitlines()[1:] # Ignore first line, irrelevant data
@@ -228,7 +228,7 @@ def fetch_metar_for_row(row):
     if current_index % 10 == 0 or current_index == total:  # print every 10 rows or last row
         print(f"Processing row {current_index}/{total} ({current_index/total:.1%})")
 
-        
+
     url = generate_request_url(row["TimestampUTC"], row["ICAO"])
     return get_metar_string(url, row["Timestamp"])
 
