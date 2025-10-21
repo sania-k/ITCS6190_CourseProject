@@ -12,38 +12,39 @@ Team Members:
 ## Data
 The sample data is stored in `Data/Sample/flight_delay_jan2025.csv`, which contains just one month of data for testing
 The data is in both the sample and the greater dataset is stored in the following columns:
-| Variable Name             | Type          | Description                                                                                                                                                                                                    |
-| ------------------------- | ------------- | ------------------------------------|
-| `Year`     | long          | Year                                |
-| `Quarter`      | long          | Quarter                             |
-| `Month`       | long          | Month                               |
-| `DayofMonth`        | long          | Day of Month                        |
-| `DayOfWeek`         | long          | Day of Week                         |
-| `FlightDate`          | timestamp_ntz | Flight Date                         |
+| Variable Name               | Type          | Description                         |
+| --------------------------- | ------------- | ------------------------------------|
+| `DestAirportID`             | integer       | Destination Airport ID              |
+| `OriginAirportID`           | integer       | Origin Airport ID                   |
+| `Year`                      | integer       | Year                                |
+| `Month`                     | integer       | Month                               |
+| `DayofMonth`                | integer       | Day of Month                        |
+| `DayOfWeek`                 | integer       | Day of Week                         |
+| `FlightDate`                | date          | Flight Date                         |
 | `Marketing_Airline_Network` | string        | Unique Marketing Carrier Code. When the same code has been used by multiple carriers, a numeric suffix is used for earlier users, e.g., PA, PA(1), PA(2). Use this field for analysis across a range of years. |
 | `OriginCityName `           | string        | Origin Airport, City Name          |
-| `DestCityName`            | string        | Destination Airport, City Name       |
-| `CRSDepTime`             | double        | CRS (scheduled) Departure Time (local time: hhmm) |
-| `DepTime`              | double        | Actual Departure Time (local time: hhmm) |
-| `DepDelay`      | double        | Difference in minutes between scheduled and actual departure time. Early departures show negative numbers.|
-| `DepDelayMinutes`       | double        | Difference in minutes between scheduled and actual departure time. Early departures set to 0. |
-| `TaxiOut`        | double        | Taxi Out Time: duration an aircraft spends taxiing from gate to runway before takeoff, in minutes |
-| `WheelsOff`         | double        | Exact moment aircraft wheels leave the ground during takeoff (local time: hhmm) |
-| `WheelsOn`          | double        | Exact moment aircraft wheels contact the runway during landing (local time: hhmm) |
-| `TaxiIn`  | double        | Taxi In Time: duration aircraft spends taxiing from runway to gate after landing, in minutes |
-| `CRSArrTime`   | double        | CRS (scheduled) Arrival Time (local time: hhmm) |
-| `ArrTime`    | double        | Actual Arrival Time (local time: hhmm) |
-| `ArrDelay`     | double        | Difference in minutes between scheduled and actual arrival time. Early arrivals show negative numbers |
-| `ArrDelayMinutes`      | double        | Difference in minutes between scheduled and actual arrival time. Early arrivals set to 0. |
-| `CRSElapsedTime`       | double        | CRS (scheduled) Elapsed Time of Flight, in minutes |
-| `ActualElapsedTime`        | double        | Elapsed Time of Flight, in minutes  |
-| `AirTime`         | double        | Flight Time, in minutes             |
-| `Distance`  | double        | Distance between airports (miles)   |
-| `DistanceGroup`   | long          | Distance intervals, every 250 miles, for flight segment |
-| `CarrierDelay`    | double        | Carrier Delay, in minutes           |
-| `WeatherDelay`     | double        | Weather Delay, in minutes            |
-| `NASDelay`      | double        | National Air System Delay, in minutes |
-| `SecurityDelay`       | double        | Security Delay, in minutes           |
+| `DestCityName`              | string        | Destination Airport, City Name       |
+| `CRSDepTime`                | double        | CRS (scheduled) Departure Time (local time: hhmm) |
+| `DepTime`                   | double        | Actual Departure Time (local time: hhmm) |
+| `DepDelay`                  | double        | Difference in minutes between scheduled and actual departure time. Early departures show negative numbers.|
+| `DepDelayMinutes`           | double        | Difference in minutes between scheduled and actual departure time. Early departures set to 0. |
+| `TaxiOut`                   | double        | Taxi Out Time: duration an aircraft spends taxiing from gate to runway before takeoff, in minutes |
+| `WheelsOff`                 | double        | Exact moment aircraft wheels leave the ground during takeoff (local time: hhmm) |
+| `WheelsOn`                  | double        | Exact moment aircraft wheels contact the runway during landing (local time: hhmm) |
+| `TaxiIn`                    | double        | Taxi In Time: duration aircraft spends taxiing from runway to gate after landing, in minutes |
+| `CRSArrTime`                | double        | CRS (scheduled) Arrival Time (local time: hhmm) |
+| `ArrTime`                   | double        | Actual Arrival Time (local time: hhmm) |
+| `ArrDelay`                  | double        | Difference in minutes between scheduled and actual arrival time. Early arrivals show negative numbers |
+| `ArrDelayMinutes`           | double        | Difference in minutes between scheduled and actual arrival time. Early arrivals set to 0. |
+| `CRSElapsedTime`            | double        | CRS (scheduled) Elapsed Time of Flight, in minutes |
+| `ActualElapsedTime`         | double        | Elapsed Time of Flight, in minutes  |
+| `AirTime`                   | double        | Flight Time, in minutes             |
+| `Distance`                  | double        | Distance between airports (miles)   |
+| `DistanceGroup`             | long          | Distance intervals, every 250 miles, for flight segment |
+| `CarrierDelay`              | double        | Carrier Delay, in minutes           |
+| `WeatherDelay`              | double        | Weather Delay, in minutes            |
+| `NASDelay`                  | double        | National Air System Delay, in minutes |
+| `SecurityDelay`             | double        | Security Delay, in minutes           |
 | `LateAircraftDelay `        | double        | Late Aircraft Delay, in minutes      |
 | `Holidays`                  | boolean       | Indicates whether the flight occurs on a holiday |
 | `CRSDepTimeMinute`          | integer       | Minute portion of scheduled departure time |
@@ -81,6 +82,82 @@ This data will be joined with METAR data at ingestioon. This can include the fol
 | └─ `Intensity`        | The intensity of the weather: light (`-`), moderate (no sign), or heavy (`+`).                           |
 | `Remarks`             | Any remaining remarks from the METAR (`RMK` section), often including station sensors or codes.          |
 
+The final dataset has the following columns:
+| Name                            | Type                            |
+| ------------------------------- | ------------------------------- |
+| DestAirportID                   | integer (nullable = true)       |
+| OriginAirportID                 | integer (nullable = true)       |
+| Year                            | integer (nullable = true)       |
+| Month                           | integer (nullable = true)       |
+| DayofMonth                      | integer (nullable = true)       |
+| DayOfWeek                       | integer (nullable = true)       |
+| FlightDate                      | date (nullable = true)          |
+| Marketing_Airline_Network       | string (nullable = true)        |
+| DOT_ID_Marketing_Airline        | integer (nullable = true)       |
+| Operating_Airline               | string (nullable = true)        |
+| DOT_ID_Operating_Airline        | integer (nullable = true)       |
+| Flight_Number_Operating_Airline | integer (nullable = true)       |
+| OriginAirportSeqID              | integer (nullable = true)       |
+| OriginCityMarketID              | integer (nullable = true)       |
+| Origin                          | string (nullable = true)        |
+| OriginCityName                  | string (nullable = true)        |
+| DestAirportSeqID                | integer (nullable = true)       |
+| DestCityMarketID                | integer (nullable = true)       |
+| Dest                            | string (nullable = true)        |
+| DestCityName                    | string (nullable = true)        |
+| CRSDepTime                      | integer (nullable = true)       |
+| DepTime                         | double (nullable = true)        |
+| DepDelay                        | double (nullable = true)        |
+| DepDelayMinutes                 | double (nullable = true)        |
+| DepDel15                        | double (nullable = true)        |
+| DepartureDelayGroups            | double (nullable = true)        |
+| DepTimeBlk                      | string (nullable = true)        |
+| TaxiOut                         | double (nullable = true)        |
+| WheelsOff                       | double (nullable = true)        |
+| WheelsOn                        | double (nullable = true)        |
+| TaxiIn                          | double (nullable = true)        |
+| CRSArrTime                      | integer (nullable = true)       |
+| ArrTime                         | double (nullable = true)        |
+| ArrDelay                        | double (nullable = true)        |
+| ArrDelayMinutes                 | double (nullable = true)        |
+| ArrDel15                        | double (nullable = true)        |
+| ArrivalDelayGroups              | double (nullable = true)        |
+| ArrTimeBlk                      | string (nullable = true)        |
+| Cancelled                       | double (nullable = true)        |
+| CancellationCode                | string (nullable = true)        |
+| Diverted                        | double (nullable = true)        |
+| CarrierDelay                    | double (nullable = true)        |
+| WeatherDelay                    | double (nullable = true)        |
+| NASDelay                        | double (nullable = true)        |
+| SecurityDelay                   | double (nullable = true)        |
+| LateAircraftDelay               | double (nullable = true)        |
+| OriginICAO                      | string (nullable = true)        |
+| OriginTimezone                  | string (nullable = true)        |
+| DestICAO                        | string (nullable = true)        |
+| DestTimezone                    | string (nullable = true)        |
+| CRSDepTimestamp                 | timestamp (nullable = true)     |
+| CRSArrTimestamp                 | timestamp (nullable = true)     |
+| CRSDepTimestamp_UTC             | timestamp (nullable = true)     |
+| CRSArrTimestamp_UTC             | timestamp (nullable = true)     |
+| OriginMetar                     | string (nullable = true)        |
+| DestMetar                       | string (nullable = true)        |
+| OriginWindDirection             | integer (nullable = true)       |
+| OriginWindSpeed                 | integer (nullable = true)       |
+| OriginWindGusts                 | integer (nullable = true)       |
+| OriginVisibility                | double (nullable = true)        |
+| OriginPrecipitation             | array<string> (nullable = true) |
+| OriginClouds                    | array<string> (nullable = true) |
+| OriginTemperature               | double (nullable = true)        |
+| OriginDewPoint                  | double (nullable = true)        |
+| DestWindDirection               | integer (nullable = true)       |
+| DestWindSpeed                   | integer (nullable = true)       |
+| DestWindGusts                   | integer (nullable = true)       |
+| DestVisibility                  | double (nullable = true)        |
+| DestPrecipitation               | array<string> (nullable = true) |
+| DestClouds                      | array<string> (nullable = true) |
+| DestTemperature                 | double (nullable = true)        |
+| DestDewPoint                    | double (nullable = true)        |
+
 
 ## Ingestion
 ### Prereqs:
@@ -91,10 +168,10 @@ This data will be joined with METAR data at ingestioon. This can include the fol
      python3 --version
      ```
 
-2. *PySpark, Selenium, Beautiful Soup, and Requests*:
+2. *PySpark, re, Requests, and pandas*:
    - Install using pip:
      ```bash
-     pip install pyspark selenium beautifulsoup4 request
+     pip install pyspark re request pandas
      ```
 
 3. *Apache Spark*:
