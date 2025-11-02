@@ -1,23 +1,19 @@
 from pyspark.sql import SparkSession, Row
-from pyspark.sql.functions import udf, col, lpad, try_to_timestamp, to_utc_timestamp, concat_ws, lit
+from pyspark.sql.functions import udf, col, lpad, try_to_timestamp, to_utc_timestamp, concat_ws, lit, window, count, min, max
 from pyspark.sql.types import StringType, IntegerType, DoubleType, FloatType, ArrayType, StructType, StructField, MapType
-import time
-import requests
-import re
-import pandas as pd
-
-
+import time, requests, re
 from datetime import datetime, timedelta
+from collections import defaultdict
+from metar_taf_parser.parser.parser import MetarParser
 
 # Creating Spark Session
 spark = SparkSession.builder.appName("AirportDelay").getOrCreate()
 
 
-# --- Loading Delay Sample Data ---
+# Loading Delay Sample Data 
 
 # Loading delay dataset from sample data
-df = spark.read.csv("../data/sample/flight_delay_jan_2025_clt_origin_major_dest.csv", header=True, inferSchema=True)
-
+df = spark.read.csv("../data/sample/flight_delay_aug2024_jul2025.csv", header=True, inferSchema=True)
 
 # Checking Columns
 df.printSchema()
@@ -33,10 +29,10 @@ df.select(
 
 
 
-# --- Adding Timestamps ---
+# Adding Timestamps
 
 # Airport dataframe to join with delay data for airport data needed for API lookups:
-# Contains top 7 airports in the US, the only airports in the database at the moment
+# Contains top 10 airports in the US, the only airports in the database at the moment
 #   AirportID - the ID as per delay data
 #   ICAO - Airport ICAO code for METAR API lookup
 #   Timezone - Airport location for timezone conversions to UTC
@@ -47,7 +43,10 @@ airport_df = spark.createDataFrame([
     (13930, "KORD", "America/Chicago"), # Chicago, IL: Chicago O"Hare International
     (12892, "KLAX", "America/Los_Angeles"), # Los Angeles, CA: Los Angeles International
     (12478, "KJFK", "America/New_York"), # New York, NY: John F. Kennedy International
-    (11057, "KCLT", "America/New_York") # Charlotte, NC: Charlotte Douglas International
+    (11057, "KCLT", "America/New_York"), # Charlotte, NC: Charlotte Douglas International
+    (12889, "KLAS", "America/Los_Angeles"), # Las Vegas, NV
+    (13204, "KMCO", "America/New_York"), # Orlando, FL
+    (13303, "KMIA", "America/New_York") # Miami, FL
 ], ["AirportID", "ICAO", "Timezone"])
 
 airport_df.select("AirportID", "ICAO", "Timezone").show()
@@ -59,7 +58,7 @@ df = df.join(
               .withColumnRenamed("Timezone", "OriginTimezone")
               .withColumnRenamed("ICAO", "OriginICAO"),
     on="OriginAirportID",
-    how="left"
+    how="inner"
 )
 
 # For destination airport
@@ -67,7 +66,7 @@ df = df.join(airport_df.withColumnRenamed("AirportID", "DestAirportID")
               .withColumnRenamed("Timezone", "DestTimezone")
               .withColumnRenamed("ICAO", "DestICAO"),
     on="DestAirportID",
-    how="left"
+    how="inner"
 )
 
 # Confirming columns
@@ -104,30 +103,132 @@ df = df.withColumn(
     )
 )
 
-# Creating timestamp columns in UTC for delay data (needed for API calls)
-# Departure timestamp
-df = df.withColumn(
-    "CRSDepTimestamp_UTC",
-    to_utc_timestamp("CRSDepTimestamp", col("OriginTimezone"))
-)
-
-# Arrival timestamp
-df = df.withColumn(
-    "CRSArrTimestamp_UTC",
-    to_utc_timestamp("CRSArrTimestamp", col("DestTimezone"))
-)
-
 # Confirming Columns
 df.select(
     "FlightDate",
     "CRSDepTime",
     "CRSDepTimeStamp",
-    "CRSDepTimeStamp_UTC"
 ).show(5, truncate=False)
 
 
 
-# --- Adding METAR Data to Dataframe---
+#  Adding METAR Data
+
+# Making 60 day windows for airports, grouped by location to minimize the amount of API called
+# 60 days is the maximum date range for the api
+
+origin_timeframes = (
+    df.withColumn("window", window("CRSDepTimestamp", "60 days"))
+    .groupBy("OriginICAO", "window")
+    .agg(
+        min("CRSDepTimestamp").alias("start_date"),
+        max("CRSDepTimestamp").alias("end_date"),
+        count("*").alias("records")
+    )
+    .withColumn("Type", lit("Origin"))
+)
+
+dest_timeframes = (
+    df.withColumn("window", window("CRSDepTimestamp", "60 days"))
+    .groupBy("DestICAO", "window")
+    .agg(
+        min("CRSDepTimestamp").alias("start_date"),
+        max("CRSDepTimestamp").alias("end_date"),
+        count("*").alias("records")
+    )
+    .withColumn("Type", lit("Destination"))  
+)
+
+# Merging dest and origin into one df for consolidation
+
+origin_timeframes = origin_timeframes.withColumnRenamed("OriginICAO", "ICAO")
+dest_timeframes = dest_timeframes.withColumnRenamed("DestICAO", "ICAO")
+
+timeframes_df = origin_timeframes.union(dest_timeframes).orderBy("ICAO", "window.start")
+
+# Show final combined result
+timeframes_df.show(truncate=False)
+
+
+# Calling METAR weather data api 
+
+# Helper functions for api calls
+def generate_request_url(start_timestamp, end_timestamp, icao_code):
+    """Returns a string: the API call URL for previous and current day
+    to ensure weather data from before departure.
+
+    timestamp(datetime) -> scheduled flight departure time (UTC)
+    icao_code(string) -> ICAO code of the airport 
+    """
+    base = "https://flightsupport24.com/map/archive.php?"
+    end = "&tz=Etc/UTC&format=onlytdf&latlon=no&elev=no&missing=M&trace=T&direct=no&report_type=2"
+    
+    if isinstance(start_timestamp, str):
+        start_timestamp = datetime.strptime(start_timestamp, "%Y-%m-%d %H:%M:%S")
+    
+    if isinstance(end_timestamp, str):
+        end_timestamp = datetime.strptime(end_timestamp, "%Y-%m-%d %H:%M:%S")
+
+    # Start of date range
+    # Going a day in case weather data before midnight flights is needed
+    interval_start = start_timestamp - timedelta(days=1)
+    day1, month1, year1 = interval_start.day, interval_start.month, interval_start.year
+
+    # End of date range
+    # Date range doesn't include current day, have to go forward one
+    interval_end = end_timestamp + timedelta(days=1)
+    day2, month2, year2 = interval_end.day, interval_end.month, interval_end.year
+
+    # Build URL
+    request_URL = (
+        f"{base}station={icao_code}&data=metar"
+        f"&year1={year1}&month1={month1}&day1={day1}"
+        f"&year2={year2}&month2={month2}&day2={day2}"
+        f"{end}"
+    )
+
+    return request_URL
+
+def get_response_list(url):
+    """Returns a list of metar data
+
+    url(string): the request url for the api call
+    """
+
+    try:
+        time.sleep(0.25) #TODO: proper api rate limitings
+        res = requests.get(url).text        
+
+        metar_list = res.strip().splitlines()[1:] # Ignore first line, irrelevant data
+        return metar_list
+
+    except requests.exceptions.RequestException as e:
+        print("Error:", e)
+        return None
+
+def get_metar_response(start_timestamp, end_timestamp,icao_code):
+    """ Makes url and api call, returns list of metar data
+
+    timestamp(datetime) -> scheduled flight departure time (UTC)
+    icao_code(string) -> ICAO code of the airport 
+    """
+    url = generate_request_url(start_timestamp, end_timestamp, icao_code)
+    return get_response_list(url)
+
+
+# Broadcasting results for faster lookup for the greater dataframe
+metar_lookup = defaultdict(list)
+
+for row in timeframes_df.collect():
+    start, end, icao = row['start_date'], row['end_date'], row['ICAO']
+    response = get_metar_response(start, end, icao)
+    metar_lookup[icao].append({
+        "start": start,
+        "end": end,
+        "response": response
+    })
+
+broadcast_metar_lookup = spark.sparkContext.broadcast(metar_lookup)
 
 # Creating schemas to describe columns being added
 weather_schema = StructType([
@@ -141,266 +242,143 @@ weather_schema = StructType([
     StructField("DewPoint",DoubleType(),True),                # deg C
 ])
 
-# Helper functions for metar data retrieval
-
-def generate_request_url(timestamp,icao_code):
-    """Returns a string: the API call URL for previous and current day
-    to ensure weather data from before departure.
-
-    timestamp(datetime) -> scheduled flight departure time (UTC)
-    icao_code(string) -> ICAO code of the airport 
-    """
-    base = "https://flightsupport24.com/map/archive.php?"
-    end = "&tz=Etc/UTC&format=onlytdf&latlon=no&elev=no&missing=M&trace=T&direct=no&report_type=2"
+# Helper functions for search and parsing of metar data
+def get_departure_metar(timestamp, icao):
+    """" Returns metar observation from right before the planned departure of a flight
     
-    if isinstance(timestamp, str):
-        timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
-
-    # Previous day
-    prev = timestamp - timedelta(days=1)
-    day1, month1, year1 = prev.day, prev.month, prev.year
-
-    # Current day
-    post = timestamp + timedelta(days=1)
-    day2, month2, year2 = post.day, post.month, post.year
-
-    # Build URL
-    request_URL = (
-        f"{base}station={icao_code}&data=metar"
-        f"&year1={year1}&month1={month1}&day1={day1}"
-        f"&year2={year2}&month2={month2}&day2={day2}"
-        f"{end}"
-    )
-
-    return request_URL
-
-def get_metar_string(url,timestamp):
-    """Returns a string of metar data from directly before the scheduled flight departure
-
-    url(string): the request url for the api call
-    timestamp(datetime): scheduled flight departure time (local)
+    timestamp(datetime): the planned departure time
+    icao(string): the origin or destination of the flight
     """
 
-    try:
-        time.sleep(0.25) #TODO: proper api rate limitings
-        res = requests.get(url).text        
+    time_pattern =  r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2})"
+    data = broadcast_metar_lookup.value.get(icao, [])
+    departure_metar = None
 
-        metar_list = res.strip().splitlines()[1:] # Ignore first line, irrelevant data
-        
-        # Finding the observation immediately before planned departure
+    # Finding the correct window (time + location) where the metar data for a specific row/flight
+    # will be stored
+    for window in data:
+        if window["start"] <= timestamp <= window["end"]: 
+            # On the correct list of metar responses, doing a binary search to more quickly
+            # find the correct row of metar data before the flight
+            # TODO: look into a better search method          
+            metar_list = window["response"]
+            left, right = 0, len(metar_list) - 1
+            
+            while left <= right:
+                mid = (left+right) // 2
+                line = metar_list[mid]
+                
+                match = re.search(time_pattern, line)
+                
+                if match:
+                    metar_timestamp = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M")
 
-        # How the timestamp is formatted in the metar strings
-        pattern = r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2})"
+                    if metar_timestamp <= timestamp:
+                        departure_metar = " ".join(line.split()[3:])
+                        left = mid + 1 
+                    else:
+                        right = mid - 1
+                else:
+                    continue
 
-        metar_line = None
+            break
 
-        for line in metar_list:
-            match = re.search(pattern,line)
-
-            if not match:
-                continue
-
-            metar_timestamp = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M")
-
-            # Since the list is sorted, can check till the observation data is after
-            # the target time and return the line before
-            if metar_timestamp >= timestamp:
-                break
-
-            metar_line = line
-
-        return metar_line
-
-    except requests.exceptions.RequestException as e:
-        print("Error:", e)
-        return None
-
-def fetch_metar_for_row(row):
-    '''Returns string of metar data using pandas df for faster retrieval
-    
-    row - row of pandas dataframe containing time and location requested
-    '''
-    # Optional: total rows for percentage calculation
-    total = len(airport_times_pd)
-    
-    # Calculate current progress
-    current_index = row.name + 1  # row.name is zero-based index
-    if current_index % 10 == 0 or current_index == total:  # print every 10 rows or last row
-        print(f"Processing row {current_index}/{total} ({current_index/total:.1%})")
-
-
-    url = generate_request_url(row["TimestampUTC"], row["ICAO"])
-    return get_metar_string(url, row["Timestamp"])
+    return departure_metar
 
 def parse_metar_string(metar_line):
-    """ Returns a row of all the metar data characteristics
-
-    metar_line -> line of metar data to be parsed
-    """
-
+    '''Parsing string through use of python-metar-taf-parser library
+    
+    metar_line(str): metar observation string
+    '''
     if not metar_line:
         return None
-
-    tokens = metar_line.split()
-
-    # Result fields
-    WindDirection= None     # in degrees from N
-    WindSpeed= None         # in kts
-    WindGusts= None         # in kts
-    Visibility= None        # statute miles
-    Precipitation= []       # type, intensity
-    Clouds= []              # time, height (ft)
-    Temperature= None       # deg C
-    DewPoint= None          # deg C
     
-    i = 5 # counter, skipping first several irrelevant fields
-    # print(tokens[i])
+    try:
+        data = MetarParser().parse(metar_line)
 
-    # --- wind data ---
-    # format: dddSSktgg
-    if i < len(tokens) and "KT" in tokens[i]:
-        # print(tokens[i])
-        wind_match = re.match(r"(\d{3})(\d{2})(G(\d+))?KT", tokens[i])
-        if wind_match:
-            WindDirection = int(wind_match.group(1))
-            WindSpeed = int(wind_match.group(2))
-            
-            # Wind gusts are optional
-            if wind_match.group(4):
-                WindGusts = int(wind_match.group(4))
-        i += 1
+        WindDirection = getattr(data._wind,"degrees", None)
+        WindSpeed = getattr(data._wind,"speed", None)
+        WindGusts = getattr(data._wind,"gust", None)
 
-    # --- visibility ---
-    # format: vvSM
-    if i < len(tokens) and tokens[i].endswith("SM"):
-        # print(tokens[i])
-        vis_match = re.match(r"(\d+)", tokens[i])
-        if vis_match:
-            Visibility = int(vis_match.group(1))
-        i += 1
+        # Visibility comes as a string like "5km" or "> 10km", must extract the number and cast
+        Visibility = None
 
-    # --- precip ---
-    # format: +/-PP
-    precip_dict = {
-        "RA": "rain", "SN": "snow", "UP": "unknown_precip",
-        "FG": "fog", "BR": "mist", "HZ": "haze", "TS": "thunderstorm",
-        "GR": "hail", "GS": "small_hail", "FZRA": "freezing_rain"
-    }
+        vis_str = getattr(data,"_visibility", None)
 
-    while i < len(tokens) and any(code in tokens[i] for code in precip_dict):
-        code = tokens[i]
-
-        if code in precip_dict:
-            Precipitation.append({
-                "type": precip_dict[code],
-            })
-        i += 1
-
-    # --- cloud cover ---
-    # format: CCChhhh
-    cloud_dict = {
-        "CLR": "clear",
-        "FEW": "few clouds",
-        "SCT": "scattered clouds",
-        "BKN": "broken clouds",
-        "OVC": "overcast"
-    }
-
-    while i < len(tokens) and re.match(r"^(CLR|FEW|SCT|BKN|OVC)\d{0,3}$", tokens[i]):
-        # print(tokens[i])
-        match = re.match(r"^(CLR|FEW|SCT|BKN|OVC)(\d{3})?", tokens[i])
+        match = re.search(r'\d+', str(vis_str))
         if match:
-            type_code = match.group(1)
-            Clouds.append({
-                "type": cloud_dict.get(type_code, "unknown"),
-            })
-        i += 1
+            Visibility = float(match.group())
 
-    # --- temp/dp ---
-    # format tt/dd
-    if i < len(tokens) and "/" in tokens[i]:
-        # print(tokens[i])
-        temp_match = re.match(r"^(M?\d{1,2})/(M?\d{1,2})$", tokens[i])
-        if temp_match:
-            t, d = temp_match.groups()
-            Temperature = -int(t[1:]) if t.startswith("M") else int(t)
-            DewPoint = -int(d[1:]) if d.startswith("M") else int(d)
+        # Weather conditions/precip is in a list of weather_condition objects
+        # Must extract the category needed
+        Precipitation = []
 
-    # Returning as row for ease of adding to dataframe
-    return Row(
-        WindDirection=WindDirection,
-        WindSpeed=WindSpeed,
-        WindGusts=WindGusts,
-        Visibility=Visibility,
-        Precipitation=[f"{p['type']}" for p in Precipitation],
-        Clouds=[f"{c['type']}" for c in Clouds],
-        Temperature=Temperature,
-        DewPoint=DewPoint    
-    )
+        # Combining the description and phenomenon for category
+        for cond in getattr(data,"_weather_conditions",None): 
+            desc = getattr(cond, "_descriptive", None)
+            phenoms = getattr(cond, "_phenomenons", [])
 
-# Creating UDF to parse data from metar into the columns in the dataframe
-parse_metar_string_udf = udf(parse_metar_string, weather_schema)
+            desc_str = desc.name.lower() if hasattr(desc, "name") else str(desc).lower() if desc else ""
+            phenoms_str = " ".join(
+                p.name.lower() if hasattr(p, "name") else str(p).lower() for p in phenoms
+                )
 
-# Getting data from df needed for API calls and putting it in a pandas dataframe
-# This is to hopefully speed it up
+            combo = " ".join(filter(None, [desc_str, phenoms_str]))
+            Precipitation.append(combo)
+            
 
-# Data from departure locations (will all be CLT)
-origin_times_pd = df.select(
-    col("OriginICAO").alias("ICAO"),
-    col("CRSDepTimestamp").alias("Timestamp"),
-    col("CRSDepTimestamp_UTC").alias("TimestampUTC")
-).distinct().toPandas()
+        # Cloud list is in a list of cloud objects
+        # Must extract the cloud type from the 
+        Clouds = []
 
-# Data from arrival locations
-dest_times_pd = df.select(
-    col("DestICAO").alias("ICAO"),
-    col("CRSDepTimestamp").alias("Timestamp"),
-    col("CRSDepTimestamp_UTC").alias("TimestampUTC")
-).distinct().toPandas()
+        for cloud in getattr(data,"_clouds",None):
+            quantity = getattr(cloud, "_quantity", None)
+            
+            if quantity:
+                Clouds.append(str(quantity))
 
-# Combining dataframes
-airport_times_pd = pd.concat([origin_times_pd, dest_times_pd]).drop_duplicates()
-print(airport_times_pd.head())
+        
+        Temperature = getattr(data, "_temperature", None)
+        DewPoint = getattr(data, "_dew_point", None)
 
-# Getting METAR data for each needed location/time
-airport_times_pd["metar"] = airport_times_pd.apply(fetch_metar_for_row, axis=1)
-print(airport_times_pd.head())
+        # Returning object as a list
+        return Row(
+            WindDirection,
+            WindSpeed,
+            WindGusts,
+            Visibility,
+            Precipitation,
+            Clouds,
+            Temperature,
+            DewPoint    
+        )
+    
+    except Exception as e:
+        # Skip unparsable lines
+        if "invalid literal for int() with base 10" in str(e):
+            print(f"Skipping malformed METAR: {metar_line}")
+        else:
+            print(f"Error parsing METAR: {metar_line}\n{e}")
+        return None
 
-# Converting back to spark dataframe
-weather_df = spark.createDataFrame(airport_times_pd)
-weather_df.select("*").show(5, truncate=False)
+    
 
-# Joining METAR data to corresponding row with correct naming convention
-origin_weather_df = weather_df.withColumnRenamed("metar", "OriginMetar")
-df = df.join(
-    origin_weather_df,
-    (df.OriginICAO == origin_weather_df.ICAO) & 
-    (df.CRSDepTimestamp_UTC == origin_weather_df.TimestampUTC),
-    "left"
-)
+def get_and_parse_metar(timestamp, icao):
+    """Returns row of weather data parsed from metar observation based on the time/location of the flight
+    
+    timestamp(datetime): the planned departure time
+    icao(string): the origin or destination of the flight
+    """
+    metar_line = get_departure_metar(timestamp, icao)
+    return parse_metar_string(metar_line)
 
-dest_weather_df = weather_df.withColumnRenamed("metar", "DestMetar")
-df = df.join(
-    dest_weather_df,
-    (df.DestICAO == dest_weather_df.ICAO) & 
-    (df.CRSDepTimestamp_UTC == dest_weather_df.TimestampUTC),
-    "left"
-)
+get_and_parse_metar_udf = udf(get_and_parse_metar, weather_schema)
 
-df.select(
-    "FlightDate",
-    "OriginCityName",
-    "OriginMetar",
-    "DestCityName",
-    "CRSDepTime",
-    "DestMetar"
-).show(5, truncate=False)
-
-# Parsing Origin(CLT) weather
-origin_weather = parse_metar_string_udf(col("OriginMetar")).alias("OriginWeather")
+# Getting Origin(CLT) weather
+origin_weather = get_and_parse_metar_udf(col("CRSDepTimeStamp"), col("OriginICAO")).alias("OriginWeather")
 df = df.withColumn("OriginWeather", origin_weather)
 
-# Expanding into seperate columns
+# Expanding into separate columns
 origin_cols = [
     col(f"OriginWeather.{c}").alias(f"Origin{c}") 
     for c in weather_schema.fieldNames()
@@ -408,11 +386,11 @@ origin_cols = [
 df = df.select("*", *origin_cols).drop("OriginWeather")
 
 
-# Parsing Destination weather
-dest_weather = parse_metar_string_udf(col("DestMetar")).alias("DestWeather")
+# Getting Destination weather
+dest_weather = get_and_parse_metar_udf(col("CRSDepTimeStamp"), col("DestICAO")).alias("DestWeather")
 df = df.withColumn("DestWeather", dest_weather)
 
-# Expanding into seperate columns
+# Expanding into separate columns
 dest_cols = [
     col(f"DestWeather.{c}").alias(f"Dest{c}") 
     for c in weather_schema.fieldNames()
@@ -423,8 +401,6 @@ df = df.select("*", *dest_cols).drop("DestWeather")
 df = df.drop("ICAO", "Timestamp", "TimestampUTC", "_c0")
 
 df.printSchema()
-print('parquet write:')
 df.write.parquet('data/sample/parquet',mode="overwrite")
-
 
 spark.stop()
