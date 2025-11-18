@@ -20,3 +20,4 @@ python3 streaming_example.py
 echo "Stopping streamer..."
 kill $STREAM_PID
 
+python3 ml_pipeline.py
