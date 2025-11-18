@@ -15,7 +15,7 @@ sleep 5
 
 # Recieve streaming
 echo "Starting Spark Structured Streaming job..."
-python3 streaming_test.py
+python3 streaming_example.py
 
 echo "Stopping streamer..."
 kill $STREAM_PID
