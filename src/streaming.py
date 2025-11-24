@@ -1,4 +1,3 @@
-# Streaming job placeholder
 import socket
 import json
 import time
@@ -7,34 +6,31 @@ import numpy as np
 import os
 import datetime
 
-PARQUET_DIR = "../data/sample/parquet_delay_and_weather_25/"
+# -----------------------------------------------------------
+# Resolve Parquet directory (portable for Docker)
+# -----------------------------------------------------------
+PARQUET_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "sample", "parquet_delay_and_weather_25"
+)
+
+print("Reading parquet from:", PARQUET_DIR)
 
 class EnhancedJSONEncoder(json.JSONEncoder):
     """Robust JSON encoder that handles datetime, numpy, and pandas objects safely."""
     def default(self, obj):
-        # Handle datetime/date
         if isinstance(obj, (datetime.datetime, datetime.date, pd.Timestamp)):
             return obj.isoformat()
-
-        # Handle numpy numeric types
         elif isinstance(obj, (np.integer,)):
             return int(obj)
         elif isinstance(obj, (np.floating,)):
             return float(obj)
-
-        # Handle numpy string / bytes
         elif isinstance(obj, (np.str_, np.bytes_)):
             return str(obj)
-
-        # Handle pandas missing values (pd.NA, NaT, None)
         elif obj is None or (isinstance(obj, float) and np.isnan(obj)):
             return None
-
-        # Handle numpy arrays and lists
         elif isinstance(obj, (np.ndarray, list, tuple)):
             return [self.default(x) for x in obj]
-
-        # Fallback: anything else, cast to string
         else:
             try:
                 return str(obj)
@@ -42,7 +38,6 @@ class EnhancedJSONEncoder(json.JSONEncoder):
                 return super().default(obj)
 
 def load_parquet_data(path):
-    """Load all Parquet files from a directory into a single DataFrame."""
     if os.path.isdir(path):
         print(f"Reading all Parquet files in directory: {path}")
         df = pd.read_parquet(path)
@@ -51,7 +46,6 @@ def load_parquet_data(path):
 
     df = df.copy()
 
-    # Normalize DepTime and create DepDatetime
     df["DepTime"] = df["DepTime"].fillna(0).astype(int).astype(str).str.zfill(4)
     df["DepDatetime"] = pd.to_datetime(
         df["FlightDate"].astype(str) + " " +
@@ -63,7 +57,6 @@ def load_parquet_data(path):
     return df
 
 def start_streaming(path, host="localhost", port=9998, delay=5.0):
-    """Stream rows from parquet dataset over a TCP socket in 5-minute batches."""
     df = load_parquet_data(path)
     print(f"Loaded {len(df)} rows from {path}")
 
