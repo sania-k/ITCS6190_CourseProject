@@ -62,7 +62,7 @@ def load_parquet_data(path):
     df = df.sort_values("DepDatetime").reset_index(drop=True)
     return df
 
-def start_streaming(path, host="localhost", port=9998, delay=5.0):
+def start_streaming(path, host="localhost", port=9995, delay=5.0):
     """Stream rows from parquet dataset over a TCP socket in 5-minute batches."""
     df = load_parquet_data(path)
     print(f"Loaded {len(df)} rows from {path}")

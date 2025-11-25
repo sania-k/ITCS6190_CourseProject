@@ -1,30 +1,30 @@
 import socket
 from pyspark.sql import SparkSession, Row
-from pyspark.sql.functions import udf, col, lpad, from_json, try_to_timestamp, concat_ws, lit, window, count, min, max, explode
+from pyspark.sql.functions import udf, col, lpad, from_json, try_to_timestamp, concat_ws, lit, window, count, min, max, explode, expr
 from pyspark.sql.types import StringType, IntegerType, DoubleType, DateType, ArrayType, StructType, StructField, TimestampType, MapType
+
+from pyspark.ml.pipeline import PipelineModel
+import pyspark.sql.functions as F
 
 
 HOST = "localhost"
-PORT = 9998
+PORT = 9995
 
-# with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-#     s.connect((HOST, PORT))
-#     print(f"Connected to {HOST}:{PORT}")
-#     try:
-#         while True:
-#             data = s.recv(4096)
+# -------------------------
+# Create Spark Session
+# -------------------------
+spark = SparkSession.builder.appName("AirportDelayPredictions").getOrCreate()
 
-#             if not data:
-#                 break
-#             print(data.decode("utf-8").strip())
-#     except KeyboardInterrupt:
-#         print("\nClient disconnected.")
+# -------------------------
+# Load your trained pipeline
+# -------------------------
+pipeline_path = "../notebooks/spark_gbt_model"
+loaded_pipeline_model = PipelineModel.load(pipeline_path)
 
 
-# Creating Spark Session
-spark = SparkSession.builder.appName("AirportDelay").getOrCreate()
-
-# Defining schema for json stream
+# -------------------------
+# Existing Schema
+# -------------------------
 record_schema = StructType([
     StructField("DestAirportID", IntegerType(), True),
     StructField("OriginAirportID", IntegerType(), True),
@@ -100,49 +100,86 @@ record_schema = StructType([
     StructField("DestDewPoint", DoubleType(), True)
 ])
 
-
 outer_schema = StructType([
     StructField("window_start", StringType(), True),
     StructField("num_records", IntegerType(), True),
     StructField("records", ArrayType(record_schema), True)
 ])
 
-# Read streaming data from the socket
+
+# -------------------------
+# Streaming Socket Input
+# -------------------------
 raw_stream = spark.readStream.format("socket") \
     .option("host", HOST) \
     .option("port", PORT) \
     .load()
 
-# Parse JSON into structured format
 parsed_stream = raw_stream.select(from_json(col("value"), outer_schema).alias("json"))
 
-# Flatten the 'records' array into individual rows
-flights_df = parsed_stream.select(explode(col("json.records")).alias("data")) \
-    .select("data.*")
+flights_df = parsed_stream.select(explode(col("json.records")).alias("data")).select("data.*")
 
-# Show some columns in console
-output_df = flights_df.select(
-    "FlightDate",
-    "OriginAirportID",
-    "OriginCityName",
-    "OriginTemperature",
-    "OriginWindSpeed",
-    "OriginVisibility",
-    "OriginPrecipitation",
-    "DestAirportID",
-    "DestCityName",
-    "DestTemperature",
-    "DestWindSpeed",
-    "DestVisibility",
-    "DestPrecipitation",
-    "CRSDepTimestamp",
-    "WeatherDelay"
+
+# ---------------------------------------------------------------
+# Minimal preprocessing so your pipeline accepts the streaming rows
+# ---------------------------------------------------------------
+model_ready_df = flights_df \
+    .withColumn("CRSDepTimestamp_ts", F.col("CRSDepTimestamp")) \
+    .withColumn("Year", F.year("CRSDepTimestamp_ts")) \
+    .withColumn("Month", F.month("CRSDepTimestamp_ts")) \
+    .withColumn("DayofMonth", F.dayofmonth("CRSDepTimestamp_ts")) \
+    .withColumn("DayOfWeek", F.dayofweek("CRSDepTimestamp_ts")) \
+    .withColumn("CRSDepTime_Str",
+        F.concat(F.lpad(F.hour("CRSDepTimestamp_ts"), 2, '0'),
+                 F.lpad(F.minute("CRSDepTimestamp_ts"), 2, '0'))
+    ) \
+    .withColumn("CRSDepTime", F.col("CRSDepTime_Str").cast(IntegerType())) \
+    .drop("CRSDepTime_Str") \
+    .withColumn("DepHour", F.hour("CRSDepTimestamp_ts")) \
+    .withColumn("ArrHour", F.floor(F.col("CRSArrTime")/100)) \
+    .withColumn("DepMinute", F.minute("CRSDepTimestamp_ts")) \
+    .withColumn("ArrMinute", F.col("CRSArrTime") % 100) \
+    .withColumn("is_weekend", F.col("DayOfWeek").isin([1,7]))
+
+
+# -------------------------
+# FILL missing values
+# -------------------------
+num_fill = ["OriginTemperature","OriginWindSpeed","DestTemperature",
+            "DestWindSpeed","OriginWindDirection","DestWindDirection"]
+
+str_fill = ["Marketing_Airline_Network","Operating_Airline","Origin","Dest",
+            "OriginClouds","DestClouds","OriginPrecipitation","DestPrecipitation"]
+
+model_ready_df = model_ready_df.fillna(0.0, subset=num_fill).fillna("UNKNOWN", subset=str_fill)
+
+
+# -------------------------
+# Apply model to each microbatch
+# -------------------------
+def predict_batch(batch_df, batch_id):
+    if batch_df.count() == 0:
+        return
+    batch_df = (
+    batch_df
+    .withColumn("OriginPrecipitation",  expr("get(OriginPrecipitation, 0)"))
+    .withColumn("OriginClouds",         expr("get(OriginClouds, 0)"))
+    .withColumn("DestPrecipitation",    expr("get(DestPrecipitation, 0)"))
+    .withColumn("DestClouds",           expr("get(DestClouds, 0)"))
 )
+    preds = loaded_pipeline_model.transform(batch_df)
+    preds.select(
+        "OriginCityName",
+        "DestCityName",
+        "CRSDepTimestamp",
+        "prediction",
+        "probability"
+    ).show(truncate=False)
 
-query = output_df.writeStream \
-    .format("console") \
+
+query = model_ready_df.writeStream \
+    .foreachBatch(predict_batch) \
     .outputMode("append") \
-    .option("truncate", False) \
     .start()
 
 query.awaitTermination()
