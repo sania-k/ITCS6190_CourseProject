@@ -7,7 +7,7 @@ import numpy as np
 import os
 import datetime
 
-PARQUET_DIR = "../data/sample/parquet/"
+PARQUET_DIR = "../data/sample/parquet_delay_and_weather_25/"
 
 class EnhancedJSONEncoder(json.JSONEncoder):
     """Robust JSON encoder that handles datetime, numpy, and pandas objects safely."""

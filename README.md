@@ -1,182 +1,364 @@
-# Team 1 ITCS6190 Course Project Repository
-## Overview
-In this cloud computing for data analysis project, our team will design and implement a big data analysis pipeline through the use of Apache Spark's structured API's, SQL, Streaming, and MLib on our dataset. Our goal is to compare a daily list of outgoing domestic flights from the Charlotte-Douglas Airport, using the timings and locations to the weather during near departure to determine the likelihood of a fight delay.
+# ITCS6190 Course Project: Flight Delay Prediction with Apache Spark
 
-Team Members:
+## Overview
+
+This is a comprehensive big data analysis project for **ITCS6190 (Cloud Computing for Data Analysis)** that designs and implements an end-to-end data pipeline using **Apache Spark**, SQL, Streaming, and MLlib. The project analyzes domestic flight data from Charlotte-Douglas International Airport (CLT) and correlates it with weather data to predict flight delays.
+
+### Project Goal
+
+Determine the likelihood of flight delays by analyzing the relationship between:
+- Flight characteristics (departure time, destination, airline, etc.)
+- Weather conditions at origin and destination airports
+- Historical delay patterns
+
+### Team Members
+
 1. Anshuk Gottipati
 2. Frank Garcia
 3. Nicholas Cassarino
 4. Purva Rajaram Jagtap
 5. Sania Khan
 
-## Data
-The sample data is stored in `Data/Sample/flight_delay_jan2025.csv`, which contains just one month of data for testing
-The data is in both the sample and the greater dataset is stored in the following columns:
-| Variable Name               | Type          | Description                         |
-| --------------------------- | ------------- | ------------------------------------|
-| `DestAirportID`             | integer       | Destination Airport ID              |
-| `OriginAirportID`           | integer       | Origin Airport ID                   |
-| `Year`                      | integer       | Year                                |
-| `Month`                     | integer       | Month                               |
-| `DayofMonth`                | integer       | Day of Month                        |
-| `DayOfWeek`                 | integer       | Day of Week                         |
-| `FlightDate`                | date          | Flight Date                         |
-| `Marketing_Airline_Network` | string        | Unique Marketing Carrier Code. When the same code has been used by multiple carriers, a numeric suffix is used for earlier users, e.g., PA, PA(1), PA(2). Use this field for analysis across a range of years. |
-| `OriginCityName `           | string        | Origin Airport, City Name          |
-| `DestCityName`              | string        | Destination Airport, City Name       |
-| `CRSDepTime`                | double        | CRS (scheduled) Departure Time (local time: hhmm) |
-| `DepTime`                   | double        | Actual Departure Time (local time: hhmm) |
-| `DepDelay`                  | double        | Difference in minutes between scheduled and actual departure time. Early departures show negative numbers.|
-| `DepDelayMinutes`           | double        | Difference in minutes between scheduled and actual departure time. Early departures set to 0. |
-| `TaxiOut`                   | double        | Taxi Out Time: duration an aircraft spends taxiing from gate to runway before takeoff, in minutes |
-| `WheelsOff`                 | double        | Exact moment aircraft wheels leave the ground during takeoff (local time: hhmm) |
-| `WheelsOn`                  | double        | Exact moment aircraft wheels contact the runway during landing (local time: hhmm) |
-| `TaxiIn`                    | double        | Taxi In Time: duration aircraft spends taxiing from runway to gate after landing, in minutes |
-| `CRSArrTime`                | double        | CRS (scheduled) Arrival Time (local time: hhmm) |
-| `ArrTime`                   | double        | Actual Arrival Time (local time: hhmm) |
-| `ArrDelay`                  | double        | Difference in minutes between scheduled and actual arrival time. Early arrivals show negative numbers |
-| `ArrDelayMinutes`           | double        | Difference in minutes between scheduled and actual arrival time. Early arrivals set to 0. |
-| `CRSElapsedTime`            | double        | CRS (scheduled) Elapsed Time of Flight, in minutes |
-| `ActualElapsedTime`         | double        | Elapsed Time of Flight, in minutes  |
-| `AirTime`                   | double        | Flight Time, in minutes             |
-| `Distance`                  | double        | Distance between airports (miles)   |
-| `DistanceGroup`             | long          | Distance intervals, every 250 miles, for flight segment |
-| `CarrierDelay`              | double        | Carrier Delay, in minutes           |
-| `WeatherDelay`              | double        | Weather Delay, in minutes            |
-| `NASDelay`                  | double        | National Air System Delay, in minutes |
-| `SecurityDelay`             | double        | Security Delay, in minutes           |
-| `LateAircraftDelay `        | double        | Late Aircraft Delay, in minutes      |
-| `Holidays`                  | boolean       | Indicates whether the flight occurs on a holiday |
-| `CRSDepTimeMinute`          | integer       | Minute portion of scheduled departure time |
-| `CRSDepTimeHour`            | integer       | Hour portion of scheduled departure time |
-| `WheelsOffMinute`           | integer       | Minute portion of wheels-off time   |
-| `WheelsOffHour`             | integer       | Hour portion of wheels-off time     |
-| `CRSArrTimeMinute`          | integer       | Minute portion of scheduled arrival time |
-| `CRSArrTimeHour`            | integer       | Hour portion of scheduled arrival time |
-| `WheelsOnMinute`            | integer       | Minute portion of wheels-on time     |
-| `WheelsOnHour`              | integer       | Hour portion of wheels-on time       |
-| `CRSDepTimeHourDis`         | string        | Discretized scheduled departure hour (for analysis) |
-| `WheelsOffHourDis`          | string        | Discretized wheels-off hour (for analysis) |
-| `CRSArrTimeHourDis`         | string        | Discretized scheduled arrival hour (for analysis) |
-| `WheelsOnHourDis`           | string        | Discretized wheels-on hour (for analysis) |
-| `CRSElapsedTimeGorup`       | long          | Grouped CRS elapsed time (for analysis) |
+---
 
-From here we can filter to look at NC data specifically, specific months, and specific airports
+## Project Structure
 
+```
+ITCS6190_CourseProject/
+├── data/
+│   └── sample/
+│       ├── flight_delay_*.csv          # Flight delay data
+│       └── parquet/                    # Processed parquet files
+├── docs/
+│   ├── methodology.md                  # Detailed methodology
+│   ├── dataset_overview.md             # Dataset schema documentation
+│   ├── results.md                      # Analysis results
+│   ├── limitations.md                  # Project limitations
+│   └── reproduction_guide.md           # How to reproduce results
+├── notebooks/
+│   ├── eda.ipynb                       # Exploratory Data Analysis
+│   ├── exploratory_analysis_viz.ipynb  # Visualization notebook
+│   ├── ingestion.ipynb                 # Data ingestion examples
+│   ├── transformations.ipynb           # Data transformation examples
+│   ├── ml_pipeline.ipynb               # ML model pipeline
+│   ├── sql_queries.ipynb               # SQL query examples
+│   ├── complex_q.ipynb                 # Complex analysis queries
+│   ├── complex_q_par.ipynb             # Parallel complex queries
+│   └── streaming_demo.ipynb            # Streaming example
+├── src/
+│   ├── ingestion.py                    # Data ingestion pipeline
+│   ├── transformations.py              # Data transformations
+│   ├── streaming.py                    # Streaming job
+│   ├── streaming_example.py            # Streaming example
+│   ├── ml_pipeline.py                  # ML model training
+│   └── utils.py                        # Utility functions
+├── tests/
+│   ├── test_ingestion.py               # Ingestion tests
+│   ├── test_ml.py                      # ML pipeline tests
+│   ├── test_sql.py                     # SQL tests
+│   └── test_streaming.py               # Streaming tests
+├── requirements.txt                     # Python dependencies
+├── Makefile                             # Build targets
+├── run.sh                               # Main execution script
+└── README.md                            # This file
+```
 
-This data will be joined with METAR data at ingestioon. This can include the following weather data for both the origin and destination of flights:
-| Data Name             | Description                                                                                              |
-| --------------------- | -------------------------------------------------------------------------------------------------------- |
-| `Time`                | The time of the observation from the METAR (third token).                                                |
-| `Wind_Direction`      | Wind direction in degrees (first three digits of the wind token, e.g., `010` for 10°).                   |
-| `Wind_Speed`          | Wind speed in knots (next two digits of the wind token, e.g., `08` for 8 knots).                         |
-| `Wind_Gust`           | Wind gust speed in knots if present (after `G` in the wind token).                                       |
-| `Visibility`          | Horizontal visibility in statute miles (if present, from the token containing `SM`).                     |
-| `Runway_Visual_Range` | Runway visual range from tokens starting with `R` (distance plus optional `M`/`P` for min/max).          |
-| `Temperature`         | Temperature in Celsius from token like `21/16` (first number).                                           |
-| `Dewpoint`            | Dewpoint in Celsius from token like `21/16` (second number).                                             |
-| `Altimeter`           | Altimeter pressure in inches of mercury from token like `A3000`.                                         |
-| `Cloud_Coverage`      | Cloud information from tokens like `OVC100`, `SCT050` (overcast, scattered, height in hundreds of feet). |
-| `Weather_Phenomena`   | A list of weather events. Each item has:                                                                 |
-| └─ `Type`             | The kind of weather (e.g., rain, fog, hail, thunderstorm, freezing rain, volcanic ash, etc.).            |
-| └─ `Intensity`        | The intensity of the weather: light (`-`), moderate (no sign), or heavy (`+`).                           |
-| `Remarks`             | Any remaining remarks from the METAR (`RMK` section), often including station sensors or codes.          |
+---
 
-The final dataset has the following columns:
-| Name                            | Type                            |
-| ------------------------------- | ------------------------------- |
-| DestAirportID                   | integer (nullable = true)       |
-| OriginAirportID                 | integer (nullable = true)       |
-| Year                            | integer (nullable = true)       |
-| Month                           | integer (nullable = true)       |
-| DayofMonth                      | integer (nullable = true)       |
-| DayOfWeek                       | integer (nullable = true)       |
-| FlightDate                      | date (nullable = true)          |
-| Marketing_Airline_Network       | string (nullable = true)        |
-| DOT_ID_Marketing_Airline        | integer (nullable = true)       |
-| Operating_Airline               | string (nullable = true)        |
-| DOT_ID_Operating_Airline        | integer (nullable = true)       |
-| Flight_Number_Operating_Airline | integer (nullable = true)       |
-| OriginAirportSeqID              | integer (nullable = true)       |
-| OriginCityMarketID              | integer (nullable = true)       |
-| Origin                          | string (nullable = true)        |
-| OriginCityName                  | string (nullable = true)        |
-| DestAirportSeqID                | integer (nullable = true)       |
-| DestCityMarketID                | integer (nullable = true)       |
-| Dest                            | string (nullable = true)        |
-| DestCityName                    | string (nullable = true)        |
-| CRSDepTime                      | integer (nullable = true)       |
-| DepTime                         | double (nullable = true)        |
-| DepDelay                        | double (nullable = true)        |
-| DepDelayMinutes                 | double (nullable = true)        |
-| DepDel15                        | double (nullable = true)        |
-| DepartureDelayGroups            | double (nullable = true)        |
-| DepTimeBlk                      | string (nullable = true)        |
-| TaxiOut                         | double (nullable = true)        |
-| WheelsOff                       | double (nullable = true)        |
-| WheelsOn                        | double (nullable = true)        |
-| TaxiIn                          | double (nullable = true)        |
-| CRSArrTime                      | integer (nullable = true)       |
-| ArrTime                         | double (nullable = true)        |
-| ArrDelay                        | double (nullable = true)        |
-| ArrDelayMinutes                 | double (nullable = true)        |
-| ArrDel15                        | double (nullable = true)        |
-| ArrivalDelayGroups              | double (nullable = true)        |
-| ArrTimeBlk                      | string (nullable = true)        |
-| Cancelled                       | double (nullable = true)        |
-| CancellationCode                | string (nullable = true)        |
-| Diverted                        | double (nullable = true)        |
-| CarrierDelay                    | double (nullable = true)        |
-| WeatherDelay                    | double (nullable = true)        |
-| NASDelay                        | double (nullable = true)        |
-| SecurityDelay                   | double (nullable = true)        |
-| LateAircraftDelay               | double (nullable = true)        |
-| OriginICAO                      | string (nullable = true)        |
-| OriginTimezone                  | string (nullable = true)        |
-| DestICAO                        | string (nullable = true)        |
-| DestTimezone                    | string (nullable = true)        |
-| CRSDepTimestamp                 | timestamp (nullable = true)     |
-| CRSArrTimestamp                 | timestamp (nullable = true)     |
-| CRSDepTimestamp_UTC             | timestamp (nullable = true)     |
-| CRSArrTimestamp_UTC             | timestamp (nullable = true)     |
-| OriginMetar                     | string (nullable = true)        |
-| DestMetar                       | string (nullable = true)        |
-| OriginWindDirection             | integer (nullable = true)       |
-| OriginWindSpeed                 | integer (nullable = true)       |
-| OriginWindGusts                 | integer (nullable = true)       |
-| OriginVisibility                | double (nullable = true)        |
-| OriginPrecipitation             | array<string> (nullable = true) |
-| OriginClouds                    | array<string> (nullable = true) |
-| OriginTemperature               | double (nullable = true)        |
-| OriginDewPoint                  | double (nullable = true)        |
-| DestWindDirection               | integer (nullable = true)       |
-| DestWindSpeed                   | integer (nullable = true)       |
-| DestWindGusts                   | integer (nullable = true)       |
-| DestVisibility                  | double (nullable = true)        |
-| DestPrecipitation               | array<string> (nullable = true) |
-| DestClouds                      | array<string> (nullable = true) |
-| DestTemperature                 | double (nullable = true)        |
-| DestDewPoint                    | double (nullable = true)        |
+## Data Overview
 
+### Flight Delay Data
 
-## Ingestion
-### Prereqs:
-1. *Python 3.x*:
-   - [Download and Install Python](https://www.python.org/downloads/)
+The project uses flight delay datasets from the Bureau of Transportation Statistics, covering domestic flights with details about:
+- **Time Information**: Scheduled/actual departure and arrival times
+- **Route Information**: Origin and destination airports, cities
+- **Delay Information**: Delay types (carrier, weather, NAS, security, late aircraft)
+- **Flight Details**: Airline, flight number, aircraft movement times
+- **Aggregate Data**: Distance, elapsed time, taxi times
+
+**Sample Data Location**: `data/sample/flight_delay_*.csv`
+
+**Key Flight Data Columns**:
+- `FlightDate`, `DayOfWeek`, `Month`, `Year` - Temporal information
+- `Origin`, `Dest` - Airport codes
+- `CRSDepTime`, `DepTime` - Scheduled vs. actual departure
+- `DepDelay`, `DepDelayMinutes` - Departure delay metrics
+- `DepDel15` - Binary flag: delay > 15 minutes
+- `WeatherDelay`, `CarrierDelay`, `NASDelay` - Delay categories
+- `Distance`, `CRSElapsedTime` - Flight characteristics
+- `TaxiOut`, `TaxiIn`, `AirTime` - Operational times
+
+### Weather Data (METAR)
+
+The pipeline enriches flight data with METAR (Meteorological Aerodrome Report) weather observations fetched via API:
+
+**Weather Features**:
+
+| Feature | Description |
+|---------|-------------|
+| `Wind_Direction` | Wind direction in degrees |
+| `Wind_Speed` | Wind speed in knots |
+| `Wind_Gust` | Wind gust speed (knots) |
+| `Visibility` | Horizontal visibility (statute miles) |
+| `Temperature` | Temperature (°C) |
+| `Dewpoint` | Dewpoint temperature (°C) |
+| `Altimeter` | Altimeter pressure (inches Hg) |
+| `Cloud_Coverage` | Cloud information (coverage and altitude) |
+| `Weather_Phenomena` | Precipitation, fog, thunderstorms, etc. |
+
+**Airports Included** (Top 10 US airports):
+- ATL (Atlanta), DFW (Dallas/Fort Worth), DEN (Denver)
+- ORD (Chicago), LAX (Los Angeles), JFK (New York)
+- CLT (Charlotte), LAS (Las Vegas), MCO (Orlando), MIA (Miami)
+
+---
+
+## Technology Stack
+
+### Core Technologies
+- **Apache Spark 3.x** - Distributed data processing and SQL
+- **PySpark** - Python API for Spark
+- **Python 3.8+** - Programming language
+- **SQL** - Data querying and analysis
+- **Jupyter Notebooks** - Interactive analysis and visualization
+
+### Libraries & Tools
+- **pandas** - Data manipulation and analysis
+- **matplotlib** - Data visualization
+- **pytest** - Unit testing framework
+- **metar_taf_parser** - METAR weather data parsing
+- **requests** - HTTP library for API calls
+
+### Data Formats
+- **CSV** - Input flight delay data
+- **Parquet** - Optimized columnar storage for processed data
+- **Spark DataFrame** - In-memory distributed data structures
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+1. **Python 3.8 or higher**
+   ```bash
+   python --version
+   ```
+
+2. **Java 8 or higher** (required for Apache Spark)
+   ```bash
+   java -version
+   ```
+
+3. **Apache Spark 3.0+**
+   - [Download from Apache Spark](https://spark.apache.org/downloads.html)
    - Verify installation:
-     ```bash
-     python3 --version
-     ```
-
-2. *PySpark, re, Requests, and pandas*:
-   - Install using pip:
-     ```bash
-     pip install pyspark re request pandas
-     ```
-
-3. *Apache Spark*:
-   - Ensure Spark is installed. You can download it from the [Apache Spark Downloads](https://spark.apache.org/downloads.html) page.
-   - Verify installation by running:
      ```bash
      spark-submit --version
      ```
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd ITCS6190_CourseProject
+   ```
+
+2. **Install Python dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Verify the installation**
+   ```bash
+   python -c "import pyspark; print('PySpark version:', pyspark.__version__)"
+   ```
+
+### Running the Project
+
+#### Option 1: Run the complete pipeline
+```bash
+bash run.sh
+```
+
+#### Option 2: Using Make
+```bash
+make run
+```
+
+#### Option 3: Run individual components
+```bash
+python src/ingestion.py
+python src/transformations.py
+python src/streaming.py
+python src/ml_pipeline.py
+```
+
+---
+
+## Project Components
+
+### 1. Data Ingestion (`src/ingestion.py`)
+- Load flight delay CSV data using Spark
+- Fetch METAR weather data via REST API
+- Join flight and weather datasets
+- Save processed data as Parquet files
+
+### 2. Data Transformations (`src/transformations.py`)
+- Feature engineering from raw data
+- Data cleaning and imputation
+- Categorical encoding and scaling
+- Creating training/test datasets
+
+### 3. Streaming Pipeline (`src/streaming.py`)
+- Real-time flight data stream processing
+- Spark Structured Streaming implementation
+- Real-time delay predictions
+- Stream aggregations and window functions
+
+### 4. ML Pipeline (`src/ml_pipeline.py`)
+- Predictive models for flight delays
+- Feature selection and engineering
+- Model training and evaluation
+- Performance metrics and feature importance
+
+### 5. Utilities (`src/utils.py`)
+- Spark session management
+- Data validation and schema checking
+- Date/time manipulation and timezone conversion
+
+---
+
+## Analysis & Notebooks
+
+The project includes Jupyter notebooks for exploratory analysis:
+
+| Notebook | Purpose |
+|----------|---------|
+| `eda.ipynb` | Exploratory Data Analysis |
+| `exploratory_analysis_viz.ipynb` | Visualizations and statistics |
+| `ml_pipeline.ipynb` | Model training and evaluation |
+| `sql_queries.ipynb` | SQL-based analysis |
+| `streaming_demo.ipynb` | Streaming pipeline demo |
+
+---
+
+## Testing
+
+Run tests with pytest:
+```bash
+pytest
+pytest tests/test_ingestion.py -v
+pytest --cov=src tests/
+```
+
+---
+
+## Key Features
+
+### Data Processing
+- ✓ Distributed batch processing with Spark  
+- ✓ Schema inference and type detection  
+- ✓ Missing data handling  
+- ✓ Efficient Parquet storage  
+
+### Feature Engineering
+- ✓ Temporal features  
+- ✓ Weather-based features  
+- ✓ Historical delay patterns  
+- ✓ Categorical encoding  
+
+### Analysis
+- ✓ SQL-based queries  
+- ✓ Window functions and aggregations  
+- ✓ Statistical analysis  
+- ✓ Feature importance  
+
+### ML & Streaming
+- ✓ Predictive models  
+- ✓ Real-time streaming  
+- ✓ Model evaluation metrics  
+- ✓ Hyperparameter tuning  
+
+---
+
+## Documentation
+
+Comprehensive documentation in `docs/`:
+- **methodology.md** - Project methodology
+- **dataset_overview.md** - Data schema and dictionary
+- **results.md** - Analysis findings
+- **limitations.md** - Project constraints
+- **reproduction_guide.md** - Reproduction steps
+
+---
+
+## Performance & Optimization
+
+- **Partitioning**: Data partitioned by date and airport
+- **Caching**: Frequently used DataFrames cached
+- **Broadcasting**: Small lookup tables broadcasted
+- **Columnar Format**: Parquet for efficient I/O
+- **Scalability**: Supports datasets > 1TB
+
+---
+
+## Troubleshooting
+
+**Spark fails to initialize**:
+```bash
+java -version
+export SPARK_HOME=/path/to/spark
+```
+
+**Out of memory**:
+```bash
+spark-submit --executor-memory 4g src/ingestion.py
+spark-submit --driver-memory 2g src/ingestion.py
+```
+
+**Module not found**:
+```bash
+pip install -r requirements.txt --force-reinstall
+```
+
+---
+
+## Contributing
+
+1. Create a feature branch
+2. Make changes and test
+3. Write/update tests
+4. Submit pull request
+
+---
+
+## References
+
+- [Apache Spark Documentation](https://spark.apache.org/docs/latest/)
+- [PySpark API](https://spark.apache.org/docs/latest/api/python/)
+- [Spark SQL Guide](https://spark.apache.org/docs/latest/sql-programming-guide.html)
+- [Bureau of Transportation Statistics](https://www.bts.gov/)
+- [METAR Format](https://en.wikipedia.org/wiki/METAR)
+- [Structured Streaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html)
+
+---
+
+## License
+
+See `LICENSE` file for details.
+
+---
+
+## Contact
+
+For questions or issues:
+- Open an issue in the repository
+- Contact the project team members
+
+---
+
+**Last Updated**: November 16, 2025  
+**Project Status**: Active Development  
+**Course**: ITCS6190 - Cloud Computing for Data Analysis

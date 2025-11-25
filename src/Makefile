@@ -17,6 +17,6 @@ run:
 	else \
 		echo "Directory $(PARQUET_DIR) exists. Skipping ingestion."; \
 	fi; \
-	echo "Running nick_bash.sh..."; \
-	bash nick_bash.sh
+	echo "Running run_bash.sh..."; \
+	bash run_bash.sh
 
