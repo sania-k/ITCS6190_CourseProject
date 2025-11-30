@@ -13,7 +13,7 @@ spark = SparkSession.builder.appName("AirportDelay").getOrCreate()
 # Loading Delay Sample Data 
 
 # Loading delay dataset from sample data
-df = spark.read.csv("../data/sample/flight_delay_aug2024_jul2025.csv", header=True, inferSchema=True)
+df = spark.read.csv("../data/sample/flight_delay_2024.csv", header=True, inferSchema=True)
 
 # Checking Columns
 df.printSchema()
@@ -325,24 +325,40 @@ def parse_metar_string(metar_line):
 
             combo = " ".join(filter(None, [desc_str, phenoms_str]))
             Precipitation.append(combo)
-            
 
         # Cloud list is in a list of cloud objects
-        # Must extract the cloud type from the 
+        # Must extract the cloud type from the object
         Clouds = []
 
-        for cloud in getattr(data,"_clouds",None):
-            quantity = getattr(cloud, "_quantity", None)
-            
-            if quantity:
-                Clouds.append(str(quantity))
+        cloud_map = {
+            "CLR": "clear",
+            "FEW": "few",
+            "SCT": "scattered",
+            "BKN": "broken",
+            "OVC": "overcast"
+        }
 
+        for cloud in getattr(data, "_clouds", None) or []:
+            quantity_obj = getattr(cloud, "_quantity", None)
+
+            if quantity_obj:
+                qty = getattr(quantity_obj, "name", str(quantity_obj))
+                qty = qty.upper()
+
+                friendly = cloud_map.get(qty, qty.lower())
+                Clouds.append(friendly)
         
+        # Temperature
         Temperature = getattr(data, "_temperature", None)
+        Temperature = float(Temperature) if Temperature else None
+        
+        # Dew point
+        
         DewPoint = getattr(data, "_dew_point", None)
+        DewPoint = float(DewPoint) if DewPoint else None
 
         # Returning object as a list
-        return Row(
+        row = Row(
             WindDirection,
             WindSpeed,
             WindGusts,
@@ -352,6 +368,8 @@ def parse_metar_string(metar_line):
             Temperature,
             DewPoint    
         )
+        
+        return row
     
     except Exception as e:
         # Skip unparsable lines
@@ -401,6 +419,6 @@ df = df.select("*", *dest_cols).drop("DestWeather")
 df = df.drop("ICAO", "Timestamp", "TimestampUTC", "_c0")
 
 df.printSchema()
-df.write.parquet('data/sample/parquet',mode="overwrite")
+df.write.parquet('../data/sample/parquet_delay_and_weather_24',mode="overwrite")
 
 spark.stop()
