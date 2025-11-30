@@ -26,14 +26,8 @@ export function Header() {
           <Button variant="ghost" onClick={() => scrollToSection("predictor")}>
             Predictor
           </Button>
-          <Button variant="ghost" onClick={() => scrollToSection("routes")}>
-            Route Map
-          </Button>
           <Button variant="ghost" onClick={() => scrollToSection("about")}>
             About
-          </Button>
-          <Button variant="ghost" onClick={() => scrollToSection("chill-zone")}>
-            Chill Zone
           </Button>
         </nav>
       </div>

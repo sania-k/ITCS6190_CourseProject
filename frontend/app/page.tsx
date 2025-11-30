@@ -12,9 +12,7 @@ export default function Home() {
       <main>
         <HeroSection />
         <FlightPredictor />
-        <RouteVisualizations />
         <AboutSection />
-        <ChillZone />
       </main>
       <footer className="border-t bg-card py-8">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
