@@ -1,0 +1,20 @@
+# Ignore frontend completely from backend builds
+frontend/
+
+# Optional: ignore any other project folders not needed by backend
+docs/
+notebooks/
+
+# Plus all the smart stuff from before:
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+.vscode/
+*.log
+# data/sample/parquet_delay_and_weather_24/
+.git
+.gitignore
+
+# Ignore new models
+spark_gbt_model/

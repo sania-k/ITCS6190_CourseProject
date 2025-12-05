@@ -6,3 +6,5 @@ requests
 metar-taf-parser-mivek
 numpy
 pyarrow
+uvicorn[standard]
+fastapi
