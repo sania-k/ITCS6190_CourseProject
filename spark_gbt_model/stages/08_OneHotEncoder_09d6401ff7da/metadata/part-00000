@@ -1,0 +1,1 @@
+{"class":"org.apache.spark.ml.feature.OneHotEncoderModel","timestamp":1764949416958,"sparkVersion":"3.5.0","uid":"OneHotEncoder_09d6401ff7da","paramMap":{"inputCol":"Marketing_Airline_Network_idx","outputCol":"Marketing_Airline_Network_ohe"},"defaultParamMap":{"handleInvalid":"error","outputCol":"OneHotEncoder_09d6401ff7da__output","dropLast":true}}

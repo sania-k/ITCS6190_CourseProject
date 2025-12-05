@@ -268,9 +268,14 @@ label_df.drop(columns=label_cols_to_drop, inplace=True)
 
 label_col = "DepDel15"
 
+# 1. Drop rows where the label is missing
+df = df.dropna(subset=[label_col])
+
+# 2. Now it is safe to cast to int
 y = df[label_col].astype(int)
 df["label"] = y
 df = df.drop(columns=[label_col])
+
 
 def hhmm_to_hour(t):
     t = int(t)
@@ -402,7 +407,7 @@ encoders = [
 assembler = VectorAssembler(
     inputCols=[c + "_ohe" for c in cat_cols] + num_cols,
     outputCol="features",
-    handleInvalid="keep")
+    handleInvalid="keep"
 )
 
 # Classifier THIS GIVE A MODEL WITH AROUND 75% accuracy really quickly
