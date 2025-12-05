@@ -22,7 +22,17 @@ The **Gradient Boosted Trees (GBT) classifier** achieved the best performance.
 
 
 **Interpretation:**
-The model is reasonably good at predicting **on-time flights**, but less accurate for the minority class (**delayed flights**). This reflects the strong class imbalance in real-world delay data.
+
+The model demonstrates solid performance in predicting on-time flights, achieving an accuracy of roughly 76%.
+However, the F1 score (≈72%) reflects the challenge posed by class imbalance—only a small fraction of flights are significantly delayed in reality. Because of this imbalance:
+
+The model is less sensitive to the delayed-flight class.
+
+Predictions lean toward the majority class (on-time flights).
+
+Improvements may require resampling strategies, class weighting, or additional feature signals (e.g., more complete weather data).
+
+Despite these constraints, the GBT model offers a strong balance between precision and recall for this dataset and serves as a reliable baseline for future enhancements.
 
 ---
 
