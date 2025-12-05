@@ -1,6 +1,3 @@
-Below is a clean, well-structured **results README.md** that you can drop directly into `docs/results.md` or a top-level `RESULTS.md`. It summarizes model performance, major findings, issues, limitations, and front-end behavior.
-
----
 
 #  Flight Delay Prediction – Results Summary
 
