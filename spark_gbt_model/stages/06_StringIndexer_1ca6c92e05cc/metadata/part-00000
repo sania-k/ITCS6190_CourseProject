@@ -1,1 +1,0 @@
-{"class":"org.apache.spark.ml.feature.StringIndexerModel","timestamp":1764949415119,"sparkVersion":"3.5.0","uid":"StringIndexer_1ca6c92e05cc","paramMap":{"outputCol":"DestPrecipitation_idx","inputCol":"DestPrecipitation","handleInvalid":"keep"},"defaultParamMap":{"outputCol":"StringIndexer_1ca6c92e05cc__output","stringOrderType":"frequencyDesc","handleInvalid":"error"}}

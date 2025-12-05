@@ -202,3 +202,18 @@ shell-backend:
 
 shell-frontend:
 	docker exec -it flight-frontend sh
+
+# Add this to the variables section at the top
+PREDICTOR_IMAGE=predictor
+
+# Add this command to the list of targets
+# ---------------------------------------
+# 8. Run Prediction Demo
+# ---------------------------------------
+predict:
+	@echo "Running prediction demo..."
+	docker build --target predictor -t $(PREDICTOR_IMAGE) .
+	docker run --rm -it \
+		-v $(PWD)/data:/app/data \
+		-v $(PWD)/spark_gbt_model:/app/spark_gbt_model \
+		$(PREDICTOR_IMAGE)

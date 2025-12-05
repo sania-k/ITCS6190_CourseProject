@@ -190,3 +190,11 @@ FROM base AS backend
 WORKDIR /app
 EXPOSE 9998
 CMD ["uvicorn", "src.backend:app", "--host", "0.0.0.0", "--port", "9998"]
+
+############################################################
+# TARGET 5 — PREDICTION DEMO
+############################################################
+FROM base AS predictor
+WORKDIR /app
+# We use spark-submit to ensure all PySpark context is loaded correctly
+CMD ["spark-submit", "src/show_predictions.py"]
