@@ -1,5 +1,6 @@
 # ITCS6190 Course Project: Flight Delay Prediction with Apache Spark
-
+## Video Link
+1. https://drive.google.com/drive/folders/1VAKRo_Ntb1KMg5Vl06BTGdT37S7UKSh-?usp=sharing
 ## Overview
 
 This is a comprehensive big data analysis project for **ITCS6190 (Cloud Computing for Data Analysis)** that designs and implements an end-to-end data pipeline using **Apache Spark**, SQL, Streaming, and MLlib. The project analyzes domestic flight data from Charlotte-Douglas International Airport (CLT) and correlates it with weather data to predict flight delays.
