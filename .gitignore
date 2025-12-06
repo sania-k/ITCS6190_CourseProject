@@ -1,6 +1,7 @@
-*.pyc
-__pycache__/
-.env
 .DS_Store
+.env
+*.pyc
 .ipynb_checkpoints/
-run.sh
+.next/
+__pycache__/
+node_modules/

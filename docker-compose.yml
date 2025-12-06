@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  backend:
+    volumes:
+      - ./data:/app/data
+      - ./spark_gbt_model:/app/spark_gbt_model
+    build:
+      context: .
+      target: backend
+    container_name: flight-backend
+    ports:
+      - "9998:9998"
+    networks:
+      - flight-net
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: flight-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: "http://localhost:9998"
+    depends_on:
+      - backend
+    networks:
+      - flight-net
+
+networks:
+  flight-net:
+    driver: bridge

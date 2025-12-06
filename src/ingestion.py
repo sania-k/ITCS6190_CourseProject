@@ -11,9 +11,7 @@ spark = SparkSession.builder.appName("AirportDelay").getOrCreate()
 
 
 # Loading Delay Sample Data 
-
-# Loading delay dataset from sample data
-df = spark.read.csv("../data/sample/flight_delay_2024.csv", header=True, inferSchema=True)
+df = spark.read.csv("data/sample/flight_delay_2024.csv", header=True, inferSchema=True)
 
 # Checking Columns
 df.printSchema()
