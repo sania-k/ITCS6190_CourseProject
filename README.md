@@ -1,9 +1,10 @@
 # ITCS6190 Course Project: Flight Delay Prediction with Apache Spark
-## Video Link
-1. https://drive.google.com/drive/folders/1VAKRo_Ntb1KMg5Vl06BTGdT37S7UKSh-?usp=sharing
+## Video Demo Link
+1. https://drive.google.com/drive/folders/1VAKRo_Ntb1KMg5Vl06BTGdT37S7UKSh-?usp=sharing# ITCS6190 Course Project: Flight Delay Prediction with Apache Spark
+
 ## Overview
 
-This is a comprehensive big data analysis project for **ITCS6190 (Cloud Computing for Data Analysis)** that designs and implements an end-to-end data pipeline using **Apache Spark**, SQL, Streaming, and MLlib. The project analyzes domestic flight data from Charlotte-Douglas International Airport (CLT) and correlates it with weather data to predict flight delays.
+This is a comprehensive big data analysis project for **ITCS6190 (Cloud Computing for Data Analysis)** that designs and implements an end-to-end data pipeline using **Apache Spark**, SQL, Streaming, and MLlib. The project analyzes domestic flight data from Charlotte-Douglas International Airport (CLT) with weather data to predict flight delays.
 
 ### Project Goal
 
@@ -28,38 +29,40 @@ Determine the likelihood of flight delays by analyzing the relationship between:
 ITCS6190_CourseProject/
 ├── data/
 │   └── sample/
-│       ├── flight_delay_*.csv          # Flight delay data
+│       ├── flight_delay_[year].csv     # Flight delay data for that year/date range
 │       └── parquet/                    # Processed parquet files
 ├── docs/
+│   └── slides/                         # Presentation slides on the project
 │   ├── methodology.md                  # Detailed methodology
-│   ├── dataset_overview.md             # Dataset schema documentation
-│   ├── results.md                      # Analysis results
+│   ├── dataset_overview.md             # Dataset documentation
+│   ├── results.md                      # Project results
 │   ├── limitations.md                  # Project limitations
 │   └── reproduction_guide.md           # How to reproduce results
+├── frontend/                         
 ├── notebooks/
 │   ├── eda.ipynb                       # Exploratory Data Analysis
-│   ├── exploratory_analysis_viz.ipynb  # Visualization notebook
+│   ├── exploratory_analysis_viz.ipynb  # Exploratory Visualizations
 │   ├── ingestion.ipynb                 # Data ingestion examples
-│   ├── transformations.ipynb           # Data transformation examples
-│   ├── ml_pipeline.ipynb               # ML model pipeline
-│   ├── sql_queries.ipynb               # SQL query examples
-│   ├── complex_q.ipynb                 # Complex analysis queries
-│   ├── complex_q_par.ipynb             # Parallel complex queries
-│   └── streaming_demo.ipynb            # Streaming example
+│   ├── complex_q.ipynb                 # Complex analysis on flight delays
+│   ├── complex_q_par.ipynb             # Parallel complex on flight delays+weather
+│   └── SparkFlightPrediction.ipynb     # Training ML model
 ├── src/
+│   ├── Makefile                        # Automates build process
+│   ├── run_bash.sh                     # Executes pipeline
+│   ├── show_predictions.py             # Batch delay predictions
+│   ├── backend.py                      # Serves ML predictions 
 │   ├── ingestion.py                    # Data ingestion pipeline
-│   ├── transformations.py              # Data transformations
-│   ├── streaming.py                    # Streaming job
-│   ├── streaming_example.py            # Streaming example
-│   ├── ml_pipeline.py                  # ML model training
-│   └── utils.py                        # Utility functions
-├── tests/
-│   ├── test_ingestion.py               # Ingestion tests
-│   ├── test_ml.py                      # ML pipeline tests
-│   ├── test_sql.py                     # SQL tests
-│   └── test_streaming.py               # Streaming tests
-├── requirements.txt                     # Python dependencies
-├── Makefile                             # Build targets
+│   ├── streaming.py                    # Streamings flight+weather data
+│   ├── streaming_example.py            # Picks up streamed data
+│   ├── ml_pipeline.py                  # Runs model inference 
+│   ├── train_model                     # Training ML model
+├── spark_gbt_model/                    # Delay Prediction Model
+├── .dockerignore                       # Files Docker should ignore
+├── .gitignore                          # Files git should ignore
+├── requirements.txt                    # Python dependencies
+├── Makefile                            # Automates project workflow
+├── Dockerfile                          # Builds service images
+├── docker-compose.yml                   # Defines service containers 
 ├── run.sh                               # Main execution script
 └── README.md                            # This file
 ```
@@ -105,12 +108,19 @@ The pipeline enriches flight data with METAR (Meteorological Aerodrome Report) w
 | `Dewpoint` | Dewpoint temperature (°C) |
 | `Altimeter` | Altimeter pressure (inches Hg) |
 | `Cloud_Coverage` | Cloud information (coverage and altitude) |
-| `Weather_Phenomena` | Precipitation, fog, thunderstorms, etc. |
+| `Precipitation` | Precipitation, fog, thunderstorms, etc. |
 
 **Airports Included** (Top 10 US airports):
-- ATL (Atlanta), DFW (Dallas/Fort Worth), DEN (Denver)
-- ORD (Chicago), LAX (Los Angeles), JFK (New York)
-- CLT (Charlotte), LAS (Las Vegas), MCO (Orlando), MIA (Miami)
+- ATL (Atlanta)
+- DFW (Dallas/Fort Worth)
+- DEN (Denver)
+- ORD (Chicago)
+- LAX (Los Angeles)
+- JFK (New York)
+- - CLT (Charlotte)
+  - LAS (Las Vegas)
+  - MCO (Orlando)
+  - MIA (Miami)
 
 ---
 
@@ -122,13 +132,19 @@ The pipeline enriches flight data with METAR (Meteorological Aerodrome Report) w
 - **Python 3.8+** - Programming language
 - **SQL** - Data querying and analysis
 - **Jupyter Notebooks** - Interactive analysis and visualization
+- **Docker** - Building and running containers
 
 ### Libraries & Tools
-- **pandas** - Data manipulation and analysis
-- **matplotlib** - Data visualization
-- **pytest** - Unit testing framework
-- **metar_taf_parser** - METAR weather data parsing
-- **requests** - HTTP library for API calls
+- **pyspark==3.5.0** – Distributed data processing framework for big data analytics.  
+- **pandas** – Data manipulation and analysis library for structured data.  
+- **matplotlib** – Plotting library for creating visualizations in Python.  
+- **pytest** – Framework for writing and running Python tests.  
+- **requests** – Simplifies making HTTP requests in Python.  
+- **metar-taf-parser-mivek** – Parses METAR and TAF aviation weather data.  
+- **numpy** – Provides support for  arrays and functions.  
+- **pyarrow** – Enables data processing.  
+- **uvicorn[standard]** – ASGI server for running Python web applications.  
+- **fastapi** – Web framework for building APIs with Python.
 
 ### Data Formats
 - **CSV** - Input flight delay data
@@ -160,127 +176,104 @@ The pipeline enriches flight data with METAR (Meteorological Aerodrome Report) w
 
 ### Installation
 
-1. **Clone the repository**
+1. Clone the project repository and enter the project directory:
+
    ```bash
-   git clone <repository-url>
+   git clone git@github.com:sania-k/ITCS6190_CourseProject.git
    cd ITCS6190_CourseProject
    ```
 
-2. **Install Python dependencies**
+2. (Optional) Create and activate a virtual environment for Python to keep dependencies isolated.
+
+3. **Install Python dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Verify the installation**
+4. **Verify the installation**
    ```bash
    python -c "import pyspark; print('PySpark version:', pyspark.__version__)"
    ```
 
 ### Running the Project
 
-#### Option 1: Run the complete pipeline
+#### In order to run the full project, including frontend, use Docker
+```bash
+make all
+```
+Then visit `localhost:3000`
+
+
+#### Run the complete pipeline (without frontend):
+##### Option 1:
 ```bash
 bash run.sh
 ```
 
-#### Option 2: Using Make
+##### Option 2: Using Make
 ```bash
 make run
 ```
 
-#### Option 3: Run individual components
-```bash
-python src/ingestion.py
-python src/transformations.py
-python src/streaming.py
-python src/ml_pipeline.py
-```
 
 ---
 
 ## Project Components
 
-### 1. Data Ingestion (`src/ingestion.py`)
-- Load flight delay CSV data using Spark
-- Fetch METAR weather data via REST API
-- Join flight and weather datasets
-- Save processed data as Parquet files
-
-### 2. Data Transformations (`src/transformations.py`)
-- Feature engineering from raw data
-- Data cleaning and imputation
-- Categorical encoding and scaling
-- Creating training/test datasets
-
-### 3. Streaming Pipeline (`src/streaming.py`)
-- Real-time flight data stream processing
-- Spark Structured Streaming implementation
-- Real-time delay predictions
-- Stream aggregations and window functions
-
-### 4. ML Pipeline (`src/ml_pipeline.py`)
-- Predictive models for flight delays
-- Feature selection and engineering
-- Model training and evaluation
-- Performance metrics and feature importance
-
-### 5. Utilities (`src/utils.py`)
-- Spark session management
-- Data validation and schema checking
-- Date/time manipulation and timezone conversion
+| File | Purpose |
+|------|----------|
+| **Makefile** | Automates project pipeline tasks like building, running, and testing. |
+| **src/backend.py** | Contains backend logic, including API endpoints or server-side functions.|
+| **src/ingestion.py** | Handles data ingestion from multiple sources into the pipeline.|
+| **src/ml_pipeline.py** | Manages data input into the machine learning model. |
+| **src/run_bash.sh** | Shell script for executing pipeline tasks in sequence. |
+| **src/show_predictions.py** | Displays or visualizes predictions from the ML model. |
+| **src/streaming.py** | Implements streaming for real-time data processing.  |
+| **src/streaming_example.py** | Example or test script for streaming functionality. |
+| **src/train_model.py** | Trains the machine learning model on input data.  |
+| **udfs.py** | Contains user-defined functions to support custom backend logic. |
 
 ---
 
 ## Analysis & Notebooks
 
-The project includes Jupyter notebooks for exploratory analysis:
+The project includes Jupyter notebooks for exploratory analysis in `notebooks/`:
 
-| Notebook | Purpose |
-|----------|---------|
-| `eda.ipynb` | Exploratory Data Analysis |
-| `exploratory_analysis_viz.ipynb` | Visualizations and statistics |
-| `ml_pipeline.ipynb` | Model training and evaluation |
-| `sql_queries.ipynb` | SQL-based analysis |
-| `streaming_demo.ipynb` | Streaming pipeline demo |
-
----
-
-## Testing
-
-Run tests with pytest:
-```bash
-pytest
-pytest tests/test_ingestion.py -v
-pytest --cov=src tests/
-```
+| File | Purpose |
+|------|---------|
+| **notebooks/eda.ipynb** | Exploratory Data Analysis |
+| **notebooks/exploratory_analysis_viz.ipynb** | Exploratory Visualizations |
+| **notebooks/ingestion.ipynb** | Data ingestion examples |
+| **notebooks/complex_q.ipynb** | Complex analysis on flight delays |
+| **notebooks/complex_q_par.ipynb** | Parallel complex analysis on flight delays + weather |
+| **notebooks/SparkFlightPrediction.ipynb** | Training ML model |
 
 ---
 
 ## Key Features
 
 ### Data Processing
-- ✓ Distributed batch processing with Spark  
-- ✓ Schema inference and type detection  
-- ✓ Missing data handling  
-- ✓ Efficient Parquet storage  
+- Distributed batch processing with Spark  
+- Schema inference and type detection  
+- Missing data handling  
+- Efficient Parquet storage  
 
 ### Feature Engineering
-- ✓ Temporal features  
-- ✓ Weather-based features  
-- ✓ Historical delay patterns  
-- ✓ Categorical encoding  
+- Temporal features  
+- Weather-based features  
+- Historical delay patterns  
+- Categorical encoding  
 
 ### Analysis
-- ✓ SQL-based queries  
-- ✓ Window functions and aggregations  
-- ✓ Statistical analysis  
-- ✓ Feature importance  
+- SQL-based queries  
+- Window functions and aggregations  
+- Statistical analysis  
+- Feature importance  
 
 ### ML & Streaming
-- ✓ Predictive models  
-- ✓ Real-time streaming  
-- ✓ Model evaluation metrics  
-- ✓ Hyperparameter tuning  
+- Predictive models  
+- Model evaluation metrics  
+- Hyperparameter tuning  
 
 ---
 
@@ -288,8 +281,8 @@ pytest --cov=src tests/
 
 Comprehensive documentation in `docs/`:
 - **methodology.md** - Project methodology
-- **dataset_overview.md** - Data schema and dictionary
-- **results.md** - Analysis findings
+- **dataset_overview.md** - Data information
+- **results.md** - Project findings
 - **limitations.md** - Project constraints
 - **reproduction_guide.md** - Reproduction steps
 
@@ -298,7 +291,7 @@ Comprehensive documentation in `docs/`:
 ## Performance & Optimization
 
 - **Partitioning**: Data partitioned by date and airport
-- **Caching**: Frequently used DataFrames cached
+- **Caching**: Frequently used data cached
 - **Broadcasting**: Small lookup tables broadcasted
 - **Columnar Format**: Parquet for efficient I/O
 - **Scalability**: Supports datasets > 1TB
@@ -306,6 +299,12 @@ Comprehensive documentation in `docs/`:
 ---
 
 ## Troubleshooting
+
+**Next.js shows errors on localhost:3000**:
+```bash
+# Refresh localhost:3000 repeatedly
+# Errors stop showing once the backend is fully warmed up
+```
 
 **Spark fails to initialize**:
 ```bash
@@ -340,26 +339,8 @@ pip install -r requirements.txt --force-reinstall
 - [Apache Spark Documentation](https://spark.apache.org/docs/latest/)
 - [PySpark API](https://spark.apache.org/docs/latest/api/python/)
 - [Spark SQL Guide](https://spark.apache.org/docs/latest/sql-programming-guide.html)
-- [Bureau of Transportation Statistics](https://www.bts.gov/)
+- [Bureau of Transportation Statistics Flight Delay Data](https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGK&QO_fu146_anzr=b0-gvzr)
+- [METAR Data](https://flightsupport24.com/map/#/metar-archive)
+     - NOTE: this website has recently been taken down
 - [METAR Format](https://en.wikipedia.org/wiki/METAR)
 - [Structured Streaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html)
-
----
-
-## License
-
-See `LICENSE` file for details.
-
----
-
-## Contact
-
-For questions or issues:
-- Open an issue in the repository
-- Contact the project team members
-
----
-
-**Last Updated**: November 16, 2025  
-**Project Status**: Active Development  
-**Course**: ITCS6190 - Cloud Computing for Data Analysis
