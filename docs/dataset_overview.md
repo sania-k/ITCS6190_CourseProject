@@ -11,8 +11,9 @@ The data is constructed by joining:
 
 Only features that would be known **before scheduled departure time** are kept for modeling to avoid label leakage.
 
-* Flight Statistics Source:
-* Metar Statistics Source: 
+* Flight Statistics Source: US DoT: [Marketting Carrier On-Time Performance](https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGK&QO_fu146_anzr=b0-gvzr)
+* Metar Statistics Source: [METAR Archive](https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGK&QO_fu146_anzr=b0-gvzr)
+   * Has been since been taken down
 ---
 
 ## 2. Record counts and structure
