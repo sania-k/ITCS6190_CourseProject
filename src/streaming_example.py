@@ -3,23 +3,8 @@ from pyspark.sql import SparkSession, Row
 from pyspark.sql.functions import udf, col, lpad, from_json, try_to_timestamp, concat_ws, lit, window, count, min, max, explode
 from pyspark.sql.types import StringType, IntegerType, DoubleType, DateType, ArrayType, StructType, StructField, TimestampType, MapType
 
-
 HOST = "localhost"
 PORT = 9998
-
-# with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-#     s.connect((HOST, PORT))
-#     print(f"Connected to {HOST}:{PORT}")
-#     try:
-#         while True:
-#             data = s.recv(4096)
-
-#             if not data:
-#                 break
-#             print(data.decode("utf-8").strip())
-#     except KeyboardInterrupt:
-#         print("\nClient disconnected.")
-
 
 # Creating Spark Session
 spark = SparkSession.builder.appName("AirportDelay").getOrCreate()
