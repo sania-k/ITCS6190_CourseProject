@@ -1,4 +1,4 @@
-# Methodology
+[# Methodology
 
 This document describes the end-to-end methodology used in the flight delay prediction system, including batch pipelines, streaming components, and the machine learning workflow. The implementation is organized into modular components under `src/`.
 
@@ -163,3 +163,4 @@ ML models are designed to be compatible with both batch scoring and real-time st
 
 This methodology provides a consistent blueprint for how flight and weather data are ingested, transformed, modeled, and served, both in batch and in real time, using Spark as the core processing engine.
 
+](https://drive.google.com/drive/folders/1VAKRo_Ntb1KMg5Vl06BTGdT37S7UKSh-)
