@@ -4,6 +4,33 @@ This guide explains how to set up the environment and rerun the full flight dela
 
 The instructions assume you are working with the `ITCS6190_CourseProject` repository.
 
+## Technology Stack
+
+### Core Technologies
+- **Apache Spark 3.x** - Distributed data processing and SQL
+- **PySpark** - Python API for Spark
+- **Python 3.8+** - Programming language
+- **SQL** - Data querying and analysis
+- **Jupyter Notebooks** - Interactive analysis and visualization
+- **Docker** - Building and running containers
+
+### Libraries & Tools
+- **pyspark==3.5.0** – Distributed data processing framework for big data analytics.  
+- **pandas** – Data manipulation and analysis library for structured data.  
+- **matplotlib** – Plotting library for creating visualizations in Python.  
+- **pytest** – Framework for writing and running Python tests.  
+- **requests** – Simplifies making HTTP requests in Python.  
+- **metar-taf-parser-mivek** – Parses METAR and TAF aviation weather data.  
+- **numpy** – Provides support for  arrays and functions.  
+- **pyarrow** – Enables data processing.  
+- **uvicorn[standard]** – ASGI server for running Python web applications.  
+- **fastapi** – Web framework for building APIs with Python.
+
+### Data Formats
+- **CSV** - Input flight delay data
+- **Parquet** - Optimized columnar storage for processed data
+- **Spark DataFrame** - In-memory distributed data structures
+
 ---
 
 ## 1. Getting Started
@@ -92,89 +119,48 @@ Consult the main project README or comments in `src/ingestion.py` if you are uns
 
 You can reproduce the full pipeline in several ways.
 
-### 4.1 Option 1: Run the complete pipeline
+### 4.1: Run the complete pipeline
 
-If you want to execute the complete end to end workflow (ingestion, transformations, ML, and streaming demo if included):
-
+If you want to execute the complete end to end workflow with frontend (ingestion, transformations, ML, and streaming demo if included):
+#### In order to run the full project, including frontend, use Docker
 ```bash
-bash run.sh
+make all
 ```
+Then visit `localhost:3000`
 
-This script should orchestrate each major step in the correct order.
 
-### 4.2 Option 2: Use Make
+### 4.2: Optional Ways:
+
+#### Option 1: Run:
+
+   ```bash
+   bash run.sh
+   ```
+   
+   This script should orchestrate each major step in the correct order.
+
+### Option 2: Use Make
 
 If the project includes a Makefile, you can run:
-
-```bash
-make run
-```
+   
+   ```bash
+   make run
+   ```
 
 This provides a single command that wraps the same steps defined in `run.sh`.
 
-### 4.3 Option 3: Run individual components
+### Option 3: Run individual components
 
 You can also run each stage separately for debugging or experimentation.
-
-1. Data ingestion
-
-   ```bash
-   python src/ingestion.py
-   ```
-
-   This step:
-   • Loads raw flight delay CSV data with Spark
-   • Fetches METAR weather data via REST API
-   • Joins flight and weather datasets
-   • Writes the combined dataset as Parquet files for downstream steps
-
-2. Data transformations
-
-   ```bash
-   python src/transformations.py
-   ```
-
-   This step:
-   • Performs feature engineering from the joined raw data
-   • Cleans and filters rows, handling missing values
-   • Applies categorical encoding and any scaling
-   • Produces train and test datasets ready for modeling
-
-3. Streaming pipeline
-
-   ```bash
-   python src/streaming.py
-   ```
-
-   This step:
-   • Starts a Spark Structured Streaming job
-   • Consumes real time or simulated flight data streams
-   • Applies the same feature pipeline and model to generate real time delay predictions
-   • Uses window functions and aggregations for streaming analytics
-
-4. ML pipeline
-
-   ```bash
-   python src/ml_pipeline.py
-   ```
-
-   This step:
-   • Loads the processed training data
-   • Builds the feature vector using Spark ML transformers
-   • Trains predictive models for `DepDel15`
-   • Evaluates performance with classification metrics
-   • Optionally computes feature importance and writes model artifacts
-
----
 
 ## 5. Reproducing Results
 
 To reproduce the main experimental results reported for this project:
 
 1. Run `src/ingestion.py` to generate the joined flight and METAR Parquet dataset if it does not already exist.
-2. Run `src/transformations.py` to produce cleaned and feature engineered train and test splits.
-3. Run `src/ml_pipeline.py` to train the model and compute evaluation metrics.
-4. Optionally run `src/streaming.py` to demonstrate real time predictions using the trained model.
+2. Run `notebooks/SparkFlightPrediction.ipnyb` to produce cleaned features, train the model, and compute evaluation metrics.
+3. Optionally run `src/streaming.py` to demonstrate real time predictions using the trained model.
+   - Run `src/streaming_example.py` to view the results in terminal.
 
 If the project stores metrics or model outputs in a particular directory (for example `outputs/` or `models/`), those locations will contain the artifacts you can compare against previously reported results.
 
