@@ -32,9 +32,8 @@ Flight and METAR data are joined to create a unified training dataset.
 
 ---
 
-## 2. Data Transformations (`src/transformations.py`)
-
-The transformation stage converts the raw joined dataset into clean, model-ready features.
+## 2. ML Pipeline (`src/SparkFlightPredictionModel.ipynb`)
+The transformation stage converts the raw joined dataset into clean, model-ready features. Then, performs model training, evaluation, and analysis.
 
 ### 2.1 Feature engineering from raw data
 
@@ -70,8 +69,31 @@ A deterministic split strategy is applied.
 • Partition the cleaned dataset into training, validation, and test sets, typically using time-based or random splits depending on the experimental design.
 • Store splits as separate Parquet datasets or partition tags to support reproducible experiments and consistent model comparison.
 
----
 
+### 2.5 Predictive model definition
+
+• Define models suitable for binary classification of `DepDel15` (0 = on-time, 1 = delayed 15+ minutes), such as gradient boosted trees, random forests, or logistic regression in Spark ML.
+• Optionally combine multiple models or experiment with different algorithms while keeping the feature transformation pipeline fixed.
+
+### 2.6 Feature selection and engineering
+
+• Assemble all numeric and encoded categorical features into a single feature vector using a VectorAssembler.
+• Perform feature selection or dimensionality reduction as needed, based on feature importance, correlation analysis, or domain knowledge.
+• Iterate on feature engineering (for example additional temporal patterns, route-level aggregates, or historical delay rates) to improve predictive performance.
+
+### 2.7 Model training and evaluation
+
+• Train models on the training split and tune hyperparameters using cross-validation or train/validation splits.
+• Evaluate models using metrics appropriate for imbalanced classification, such as precision, recall, F1, ROC-AUC, and PR-AUC, in addition to plain accuracy.
+• Log results, configuration, and model artifacts for reproducibility.
+
+### 2.8 Performance analysis and feature importance
+
+• Use built-in feature importance (for example from tree-based models) and additional analysis to understand which features drive predictions.
+• Aggregate performance by segment (for example by airline, airport, time-of-day, or weather regime) to identify strengths and weaknesses of the model.
+• Summarize findings to guide further feature engineering and future model upgrades.
+
+---
 ## 3. Streaming Pipeline (`src/streaming.py`)
 
 The streaming component enables real-time delay prediction using Spark Structured Streaming.
@@ -97,62 +119,11 @@ The streaming component enables real-time delay prediction using Spark Structure
 
 • Use window functions and aggregations to compute statistics over time, such as average predicted delay probability per airport, airline, or route.
 • Maintain rolling metrics (for example 15-minute, 1-hour, or daily windows) to support operational monitoring and analytics.
-
 ---
 
-## 4. ML Pipeline (`src/SparkFlightPredictionModel.ipynb`)
+## 4. Cross-Cutting Methodology
 
-The ML pipeline encapsulates feature preparation, model training, evaluation, and analysis.
-
-### 4.1 Predictive model definition
-
-• Define models suitable for binary classification of `DepDel15` (0 = on-time, 1 = delayed 15+ minutes), such as gradient boosted trees, random forests, or logistic regression in Spark ML.
-• Optionally combine multiple models or experiment with different algorithms while keeping the feature transformation pipeline fixed.
-
-### 4.2 Feature selection and engineering
-
-• Assemble all numeric and encoded categorical features into a single feature vector using a VectorAssembler.
-• Perform feature selection or dimensionality reduction as needed, based on feature importance, correlation analysis, or domain knowledge.
-• Iterate on feature engineering (for example additional temporal patterns, route-level aggregates, or historical delay rates) to improve predictive performance.
-
-### 4.3 Model training and evaluation
-
-• Train models on the training split and tune hyperparameters using cross-validation or train/validation splits.
-• Evaluate models using metrics appropriate for imbalanced classification, such as precision, recall, F1, ROC-AUC, and PR-AUC, in addition to plain accuracy.
-• Log results, configuration, and model artifacts for reproducibility.
-
-### 4.4 Performance analysis and feature importance
-
-• Use built-in feature importance (for example from tree-based models) and additional analysis to understand which features drive predictions.
-• Aggregate performance by segment (for example by airline, airport, time-of-day, or weather regime) to identify strengths and weaknesses of the model.
-• Summarize findings to guide further feature engineering and future model upgrades.
-
----
-
-## 5. Utilities (`src/utils.py`)
-
-The utilities module contains shared helpers used throughout ingestion, transformation, ML, and streaming.
-
-### 5.1 Spark session management
-
-• Provide a single entry point to create and configure a SparkSession with appropriate application name, logging, and resource settings.
-• Encapsulate cluster-specific configuration (for example master URL, memory, shuffle settings) so that pipeline code remains environment-agnostic.
-
-### 5.2 Data validation and schema checking
-
-• Implement schema definitions and validation routines to ensure that ingested data matches expected types and constraints.
-• Run checks for common issues (for example missing key columns, unexpected null rates, invalid categorical values) before continuing pipeline execution.
-
-### 5.3 Date and time utilities
-
-• Helper functions for converting between formats (for example `YYYYMMDD`, `HHMM`, timestamps), time zones, and calendar features.
-• Functions for computing weekend flags, local vs UTC time, and aligning times between flight schedules and METAR observations.
-
----
-
-## 6. Cross-Cutting Methodology
-
-### 6.1 Data processing
+### 4.1 Data processing
 
 The pipeline leverages Spark for distributed batch and streaming processing.
 
@@ -161,7 +132,7 @@ The pipeline leverages Spark for distributed batch and streaming processing.
 • Systematic handling of missing data through cleaning, filtering, and controlled imputation strategies.
 • Use of Parquet as the primary storage format for efficient compression, predicate pushdown, and interoperability across batch and streaming components.
 
-### 6.2 Feature engineering
+### 4.2 Feature engineering
 
 Feature engineering is central to capturing the dynamics of flight delays.
 
@@ -170,7 +141,7 @@ Feature engineering is central to capturing the dynamics of flight delays.
 • Historical and operational patterns: delay indicators and aggregated statistics can be incorporated in future iterations to capture route and airline behavior.
 • Consistent categorical encoding across batch, ML, and streaming paths to maintain coherent feature spaces.
 
-### 6.3 Analysis
+### 4.3 Analysis
 
 Spark SQL and DataFrame APIs support exploratory analysis and monitoring.
 
@@ -179,7 +150,7 @@ Spark SQL and DataFrame APIs support exploratory analysis and monitoring.
 • Statistical analysis and visualization (where integrated) to compare model predictions against observed outcomes and to validate assumptions.
 • Feature importance analysis to guide data and modeling decisions.
 
-### 6.4 ML and streaming integration
+### 4.4 ML and streaming integration
 
 ML models are designed to be compatible with both batch scoring and real-time streaming.
 
